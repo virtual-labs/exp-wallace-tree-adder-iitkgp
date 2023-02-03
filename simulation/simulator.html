@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Web simulator</title>		
+        <meta name="viewport" content="width=device-width">  
+        <!--<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">-->
+        <style>
+            .node {
+                display:inline-flex;
+            }
+            .switch {
+                display:inline-flex;
+            }
+            .action {
+                display:inline-flex;
+            }
+            .float-container {
+                position: absolute;
+                display: grid;
+                width: 100%;
+                grid-template-columns: 70% 30%;
+                grid-gap: 20px;
+            }           
+            .float-child1 {
+                position: relative;                
+                overflow: scroll;
+                height: 600px;
+                width: 100%;
+            }
+            /*            .float-child2 {
+                            position: relative;
+                        }*/
+            /*            canvas {
+                            position: relative;
+                        }*/
+            .stack {
+                position:relative;
+            }
+            .stack canvas {
+                position:absolute;
+                left:0;
+                top:0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="float-container">
+            <div class="stack float-child1">
+                <canvas id="bb_canvas" width="1500" height="1000" style="border: 1px solid black;">
+                    Your browser does not support the HTML 5 Canvas. 
+                </canvas>
+                <canvas id="dc_canvas" width="1500" height="1000" style="border: 1px solid black;">
+                    Your browser does not support the HTML 5 Canvas. 
+                </canvas>                
+            </div>
+            <div class="float-child2">
+                <div id="menu" class="menu">
+                    <!--			<div class="closebutton" onclick="togglemenu(this)">
+                                                    Pallette
+                                            </div>
+                    -->			
+                    <div class="menusection">
+                        <div class="section">Inputs-Outputs</div>
+                        <div id="BITSwitch" class="switch"><input type="button" value="BITSwitch" /></div>
+                        <div id="BITDisplay" class="switch"><input type="button" value="BITDisplay" /></div>
+                    </div>
+                    <div class="menusection">
+                        <div class="section">Logic Gates</div>
+                        <!-- <div id="OR" class="node"/> background-image="images/Or-gate-en.svg" width="50" height="50"></div> -->
+                        <div id="OR" class="node"><input type="button" value="OR" /></div>
+                        <div id="NOR" class="node"><input type="button" value="NOR" /></div>
+                        <div id="XOR" class="node"><input type="button" value="XOR" /></div>
+                        <div id="XNOR" class="node"><input type="button" value="XNOR" /></div>
+                        <div id="AND" class="node"><input type="button" value="AND" /></div>
+                        <div id="NAND" class="node"><input type="button" value="NAND" /></div>
+                        <div id="NOT" class="node"><input type="button" value="NOT" /></div>                        
+                    </div>
+                    <div class="menusection">
+                        <div class="section">Components</div>   
+                        <input type="file" name="inputfile"
+                               id="inputfile">
+                        <br>
+
+                        <pre id="output"></pre>
+                        <div class="IC"><input id='comp1' type="button" value="Component1" /></div>                                                
+                    </div>
+                    <div class="menusection">
+                        <div class="section">Action</div>                        
+                        <div id="sim_btn" class="action">
+                            <input type="button" value="SIMULATE" />
+                        </div>
+                        <div id="save_dc_btn" class="action">
+                            <input type="button" value="Save As Component" />
+                        </div>
+                    </div>                    
+                    <div class="menusection">
+                        <div class="comp_meta">
+                            <div class="section">Component Name</div>                        
+                            <div class="text">
+                                <input id="comp_name" type="text"/>
+                            </div>
+                            <div class="section">PIN Description</div>                        
+                            <div class="text">
+                                <textarea id="pin_desc"></textarea>
+                            </div>
+                        </div>                        
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!--<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" ></script>-->
+        <script src="./js/jquery-3.4.1.js"></script>
+        <script src="./js/FileSaver.js"></script>
+        <script src="./js/canvas.js"></script>
+        <script type="text/javascript">
+            document.getElementById('inputfile')
+                    .addEventListener('change', function () {
+
+                        var fr = new FileReader();
+                        fr.onload = function () {
+                            document.getElementById('output')
+                                    .textContent = fr.result;
+                        }
+
+                        fr.readAsText(this.files[0]);
+                    })
+        </script>
+    </body>
+</html>
