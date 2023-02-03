@@ -9,7 +9,7 @@ You are required to build the following Wallace tree adders
 - Adder to add five 4-bit numbers
 - Adder to add seven 4-bit numbers
 
-## Circuit diagram of Ripple Carry Adder:
+## Circuit diagram of Wallace Tree Adder:
 
 <center>
 <img src='./images/Img4.png'>
