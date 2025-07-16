@@ -589,15 +589,16 @@ class LineSegment extends Element {
     end_pt = {};
     id = -1;
     type = 'linesegment';
+    con_id = -1;
     constructor(id, start_pt, end_pt) {
         super();
         this.id = id;
         this.start_pt = start_pt;
         this.end_pt = end_pt;
         if (start_pt.x === end_pt.x) {
-            this.orientation = 'V';
+            this.direction = 'V';
         } else {
-            this.orientation = 'H';
+            this.direction = 'H';
         }
     }
 
@@ -607,8 +608,8 @@ class LineSegment extends Element {
         var y = pt.y;
         var ln_start_pt = this.start_pt;
         var ln_end_pt = this.end_pt;
-        if ((this.orientation === 'H' && y === ln_start_pt.y && x >= ln_start_pt.x && x <= ln_end_pt.x)
-                || (this.orientation === 'V' && x === ln_start_pt.x && y >= ln_start_pt.y && y <= ln_end_pt.y)) {
+        if ((this.direction === 'H' && y === ln_start_pt.y && x >= ln_start_pt.x && x <= ln_end_pt.x)
+                || (this.direction === 'V' && x === ln_start_pt.x && y >= ln_start_pt.y && y <= ln_end_pt.y)) {
             flag = true;
         }
         return flag;
@@ -630,9 +631,12 @@ class LineSegment extends Element {
 
 class Jumper extends Element {
     start_pt = {};
-    arc_start_pt = {};
-    arc_center_pt = {};
-    arc_end_pt = {};
+    arc1_start_pt = {};
+    arc1_center_pt = {};
+    arc2_center_pt = {};
+    arc2_start_pt = {};
+    j_line_start_pt = {};
+    j_line_end_pt = {};
     end_pt = {};
     radius = dot_gap / 2;
     direction = 'V';
@@ -640,31 +644,60 @@ class Jumper extends Element {
     id = -1;
     type = 'jumper';
     sel_flag = false;
-    constructor(id, x, y, direction, orientation) {
+    con_id = -1;
+    constructor(id, start_x, start_y, end_x, end_y, direction, orientation) {
         super();
         this.id = id;
-        this.start_pt.x = x;
-        this.start_pt.y = y;
+        this.start_pt.x = start_x;
+        this.start_pt.y = start_y;
+        this.end_pt.x = end_x;
+        this.end_pt.y = end_y;
         this.direction = direction;
         this.orientation = orientation;
         if (this.direction === 'V') {
-            this.arc_center_pt.x = x;
-            this.arc_center_pt.y = y + dot_gap;
-            this.arc_start_pt.x = x;
-            this.arc_start_pt.y = y + dot_gap / 2;
-            this.end_pt.x = x;
-            this.end_pt.y = y + 2 * dot_gap;
-            this.arc_end_pt.x = x;
-            this.arc_end_pt.y = this.arc_start_pt.y + dot_gap;
+            this.arc1_center_pt.x = start_x;
+            this.arc1_center_pt.y = start_y + dot_gap;
+            this.arc1_start_pt.x = start_x;
+            this.arc1_start_pt.y = start_y + dot_gap / 2;
+            this.arc2_center_pt.x = end_x;
+            this.arc2_center_pt.y = end_y - dot_gap;
+            this.arc2_start_pt.x = end_x;
+            this.arc2_start_pt.y = end_y - dot_gap / 2;
+            if (start_y !== end_y) {
+                if ("L" === orientation) {
+                    this.j_line_start_pt.x = start_x - dot_gap / 2;
+                    this.j_line_start_pt.y = start_y + dot_gap;
+                    this.j_line_end_pt.x = end_x - dot_gap / 2;
+                    this.j_line_end_pt.y = end_y - dot_gap;
+                } else {
+                    this.j_line_start_pt.x = start_x + dot_gap / 2;
+                    this.j_line_start_pt.y = start_y + dot_gap;
+                    this.j_line_end_pt.x = end_x + dot_gap / 2;
+                    this.j_line_end_pt.y = end_y - dot_gap;
+                }
+            }
         } else if (this.direction === 'H') {
-            this.arc_center_pt.x = this.start_pt.x + dot_gap;
-            this.arc_center_pt.y = this.start_pt.y;
-            this.arc_start_pt.x = this.start_pt.x + dot_gap / 2;
-            this.arc_start_pt.y = this.start_pt.y;
-            this.end_pt.x = x + 2 * dot_gap;
-            this.end_pt.y = y;
-            this.arc_end_pt.x = this.arc_start_pt.x + dot_gap;
-            this.arc_end_pt.y = y;
+            this.arc1_center_pt.x = start_x + dot_gap;
+            this.arc1_center_pt.y = start_y;
+            this.arc1_start_pt.x = start_x + dot_gap / 2;
+            this.arc1_start_pt.y = start_y;
+            this.arc2_center_pt.x = end_x - dot_gap;
+            this.arc2_center_pt.y = end_y;
+            this.arc2_start_pt.x = end_x - dot_gap / 2;
+            this.arc2_start_pt.y = end_y;
+            if (start_x !== end_x) {
+                if ("L" === orientation) {
+                    this.j_line_start_pt.x = start_x + dot_gap;
+                    this.j_line_start_pt.y = start_y - dot_gap / 2;
+                    this.j_line_end_pt.x = end_x - dot_gap;
+                    this.j_line_end_pt.y = end_y - dot_gap / 2;
+                } else {
+                    this.j_line_start_pt.x = start_x + dot_gap;
+                    this.j_line_start_pt.y = start_y + dot_gap / 2;
+                    this.j_line_end_pt.x = end_x - dot_gap;
+                    this.j_line_end_pt.y = end_y + dot_gap / 2;
+                }
+            }
         }
     }
 
@@ -694,21 +727,38 @@ class Jumper extends Element {
         ctx.strokeStyle = conn_color;
         ctx.beginPath();
         ctx.moveTo(this.start_pt.x, this.start_pt.y);
-        ctx.lineTo(this.arc_start_pt.x, this.arc_start_pt.y);
+        ctx.lineTo(this.arc1_start_pt.x, this.arc1_start_pt.y);
         ctx.stroke();
         ctx.beginPath();
         if (this.direction === 'V' && this.orientation === 'L') {
-            ctx.arc(this.arc_center_pt.x, this.arc_center_pt.y, this.radius, 0.5 * Math.PI, 1.5 * Math.PI);
+            ctx.arc(this.arc1_center_pt.x, this.arc1_center_pt.y, this.radius, 1.5 * Math.PI, Math.PI, true);
         } else if (this.direction === 'V' && this.orientation === 'R') {
-            ctx.arc(this.arc_center_pt.x, this.arc_center_pt.y, this.radius, 1.5 * Math.PI, 0.5 * Math.PI);
+            ctx.arc(this.arc1_center_pt.x, this.arc1_center_pt.y, this.radius, 1.5 * Math.PI, 0);
         } else if (this.direction === 'H' && this.orientation === 'L') {
-            ctx.arc(this.arc_center_pt.x, this.arc_center_pt.y, this.radius, Math.PI, 2 * Math.PI);
+            ctx.arc(this.arc1_center_pt.x, this.arc1_center_pt.y, this.radius, Math.PI, 1.5 * Math.PI);
         } else if (this.direction === 'H' && this.orientation === 'R') {
-            ctx.arc(this.arc_center_pt.x, this.arc_center_pt.y, this.radius, 0, Math.PI);
+            ctx.arc(this.arc1_center_pt.x, this.arc1_center_pt.y, this.radius, 0.5 * Math.PI, Math.PI);
+        }
+        ctx.stroke();
+        if (Object.keys(this.j_line_start_pt).length > 0) {
+            ctx.beginPath();
+            ctx.moveTo(this.j_line_start_pt.x, this.j_line_start_pt.y);
+            ctx.lineTo(this.j_line_end_pt.x, this.j_line_end_pt.y);
+            ctx.stroke();
+        }
+        ctx.beginPath();
+        if (this.direction === 'V' && this.orientation === 'L') {
+            ctx.arc(this.arc2_center_pt.x, this.arc2_center_pt.y, this.radius, 0.5 * Math.PI, Math.PI);
+        } else if (this.direction === 'V' && this.orientation === 'R') {
+            ctx.arc(this.arc2_center_pt.x, this.arc2_center_pt.y, this.radius, 0, 0.5 * Math.PI);
+        } else if (this.direction === 'H' && this.orientation === 'L') {
+            ctx.arc(this.arc2_center_pt.x, this.arc2_center_pt.y, this.radius, 0, 1.5 * Math.PI, true);
+        } else if (this.direction === 'H' && this.orientation === 'R') {
+            ctx.arc(this.arc2_center_pt.x, this.arc2_center_pt.y, this.radius, 0, 0.5 * Math.PI);
         }
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(this.arc_end_pt.x, this.arc_end_pt.y);
+        ctx.moveTo(this.arc2_start_pt.x, this.arc2_start_pt.y);
         ctx.lineTo(this.end_pt.x, this.end_pt.y);
         ctx.stroke();
         if (sel_flag) {
@@ -727,11 +777,11 @@ class Connection extends Element {
     id = -1;
     type = 'connection';
     last_flag = false;
-    constructor(start_pt, end_pt, line_segments) {
+    constructor(line_segments) {
         super();
         this.val = -1;
-        this.start_pt = start_pt;
-        this.end_pt = end_pt;
+//        this.start_pt = start_pt;
+//        this.end_pt = end_pt;
         this.line_segments = line_segments;
     }
 
@@ -813,9 +863,14 @@ class Circuit {
 //    }
 
     add_chip(chip) {
-        this.chips.push(chip.id);
-        this.cir_ele.push(chip.id);
-        this.cir_ele_map[chip.id] = chip;
+        var id = chip.id;
+        if (this.chips.indexOf(id) === -1) {
+            this.chips.push(id);
+        }
+        if (this.cir_ele.indexOf(id) === -1) {
+            this.cir_ele.push(id);
+        }
+        this.cir_ele_map[id] = chip;
     }
 
     draw_chips() {
@@ -826,21 +881,32 @@ class Circuit {
     }
 
     add_component(component) {
-        this.components.push(component.id);
-        this.cir_ele.push(component.id);
+        var id = component.id;
+        if (this.components.indexOf(id) === -1) {
+            this.components.push(id);
+        }
+        if (this.cir_ele.indexOf(id) === -1) {
+            this.cir_ele.push(id);
+        }
         this.cir_ele_map[component.id] = component;
     }
 
     draw_components() {
         for (let id of this.components) {
+            console.log("comp id: " + id);
             var comp = this.cir_ele_map[id];
             comp.draw_component(this.ctx);
         }
     }
 
     add_line_segment(line_segment) {
-        this.ln_segs.push(line_segment.id);
-        this.cir_ele.push(line_segment.id);
+        var id = line_segment.id;
+        if (this.ln_segs.indexOf(id) === -1) {
+            this.ln_segs.push(id);
+        }
+        if (this.cir_ele.indexOf(id) === -1) {
+            this.cir_ele.push(id);
+        }
         this.cir_ele_map[line_segment.id] = line_segment;
     }
 
@@ -855,14 +921,24 @@ class Circuit {
     }
 
     add_memory(bit) {
-        this.memory_bits.push(bit.id);
-        this.cir_ele.push(bit.id);
+        var id = bit.id;
+        if (this.memory_bits.indexOf(id) === -1) {
+            this.memory_bits.push(id);
+        }
+        if (this.cir_ele.indexOf(id) === -1) {
+            this.cir_ele.push(id);
+        }
         this.cir_ele_map[bit.id] = bit;
     }
 
     add_bit(bit) {
-        this.bits.push(bit.id);
-        this.cir_ele.push(bit.id);
+        var id = bit.id;
+        if (this.bits.indexOf(id) === -1) {
+            this.bits.push(id);
+        }
+        if (this.cir_ele.indexOf(id) === -1) {
+            this.cir_ele.push(id);
+        }
         this.cir_ele_map[bit.id] = bit;
     }
 
@@ -876,16 +952,21 @@ class Circuit {
     draw_memory_bits() {
         for (let id of this.memory_bits) {
             var bit = this.cir_ele_map[id];
-            console.log("bit type: " + bit.type);
+            //console.log("bit type: " + bit.type);
             bit.draw_memory(this.ctx);
         }
     }
 
     add_clock(clock) {
         this.clock_id = clock.id;
-        this.cir_ele.push(clock.id);
+        var id = clock.id;
+        if (this.bits.indexOf(id) === -1) {
+            this.bits.push(id);
+        }
+        if (this.cir_ele.indexOf(id) === -1) {
+            this.cir_ele.push(id);
+        }
         this.cir_ele_map[clock.id] = clock;
-//        //console.log("Clock Added");
     }
 
     draw_clocks() {
@@ -1251,6 +1332,201 @@ class Circuit {
         }
     }
 
+    split_connection(conn_id) {
+        //console.log("Inside split_connection: " + conn_id);
+        var conn = this.cir_ele_map[conn_id];
+        var conn_map = [];
+        var processed_segs = [];
+        var new_set = [];
+        var tested_for_segs = [];
+        for (let line_segment of conn.line_segments) {
+            if (processed_segs.indexOf(line_segment.id) >= 0) {
+                continue;
+            }
+            processed_segs.push(line_segment.id);
+            new_set = [];
+            new_set.push(line_segment);
+            var gflag = true;
+            tested_for_segs = [];
+            while (gflag) {
+                gflag = false;
+                for (let new_ls of new_set) {
+                    var seg_id = new_ls.id;
+                    //console.log("seg_id: " + seg_id);
+                    if (tested_for_segs.indexOf(seg_id) === -1) {
+                        tested_for_segs.push(seg_id);
+                    }
+                    var s_start_pt = new_ls.start_pt;
+                    var s_end_pt = new_ls.end_pt;
+                    var i = 0;
+                    var loop_start = 0;
+                    var loop_end = 0;
+                    var step = dot_gap;
+                    var x = 0;
+                    var y = 0;
+                    if (new_ls.direction === 'H') {
+                        loop_start = s_start_pt.x;
+                        loop_end = s_end_pt.x;
+                        y = s_start_pt.y;
+                    } else {
+                        x = s_start_pt.x;
+                        loop_start = s_start_pt.y;
+                        loop_end = s_end_pt.y;
+                    }
+
+                    if (new_ls instanceof Jumper) {
+                        step = loop_end - loop_start;
+                    }
+
+                    for (let line of conn.line_segments) {
+                        var flag = false;
+                        var line_id = line.id;
+                        if (seg_id === line_id || processed_segs.indexOf(line_id) >= 0) {
+                            continue;
+                        }
+                        var c_start_pt = line.start_pt;
+                        var c_end_pt = line.end_pt;
+                        for (i = loop_start; i <= loop_end; i += step) {
+                            if (new_ls.direction === 'H') {
+                                x = i;
+                            } else {
+                                y = i;
+                            }
+
+                            if (line instanceof LineSegment && ((x === c_start_pt.x && y >= c_start_pt.y && y <= c_end_pt.y) || (y === c_start_pt.y && x >= c_start_pt.x && x <= c_end_pt.x))) {
+                                flag = true;
+                                gflag = true;
+                                //console.log("line_id: " + line_id + " flag1: " + flag);
+                            } else if (line instanceof Jumper && ((x === c_start_pt.x && y === c_start_pt.y) || (x === c_end_pt.x && y === c_end_pt.y))) {
+                                flag = true;
+                                gflag = true;
+                                console.log("line_id: " + line_id + " flag2: " + flag);
+                            }
+
+                            if (flag) {
+                                if (processed_segs.indexOf(line_id) === -1 && new_set.indexOf(line_id) === -1) {
+                                    new_set.push(line);
+                                    processed_segs.push(line_id);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            console.log("new_set: " + new_set.length);
+            conn_map.push(new_set);
+        }
+
+        console.log("conn_map.length: " + conn_map.length);
+        if (conn_map.length > 1) {
+            //conn_map.forEach((value, key) => {
+            for (var i = 0; i < conn_map.length; i++) {
+                var line_segs = conn_map[i];
+                var new_conn = new Connection(line_segs);
+                new_conn.id = available_id;
+                available_id = available_id + 1;
+                new_conn.updateTerminalPts();
+                dc.add_new_connection(new_conn);
+            }
+            const index = this.connections.indexOf(conn_id);
+            if (index > -1) { // only splice array when item is found
+                this.connections.splice(index, 1); // 2nd parameter means remove one item only
+            }
+            delete this.cir_ele_map[conn_id];
+            return true;
+        }
+
+        return false;
+    }
+
+    delete_last() {
+        var flag = false;
+        var id = this.cir_ele[this.cir_ele.length - 1];
+        var ele = this.cir_ele_map[id];
+        console.log("Delete Ele Type: " + ele.type + " Ele.id: " + id);
+        if (ele.type === 'connection') {
+            this.connections.splice(this.connections.indexOf(id), 1);
+            flag = true;
+        } else if (ele.type === 'chip') {
+            this.chips.splice(this.chips.indexOf(id), 1);
+            flag = true;
+        } else if (ele.type === 'memory') {
+            this.memory_bits.splice(this.memory_bits.indexOf(id), 1);
+            flag = true;
+        } else if (ele.type === 'inbit' || ele.type === 'outbit') {
+            this.bits.splice(this.bits.indexOf(id), 1);
+            this.inbit_pts.splice(this.inbit_pts.indexOf(id), 1);
+            this.outbit_pts.splice(this.outbit_pts.indexOf(id), 1);
+            flag = true;
+        } else if (ele.type === 'component') {
+            this.components.splice(this.components.indexOf(id), 1);
+            flag = true;
+        } else if (ele.type === 'clock') {
+            this.clock = null;
+            flag = true;
+        } else if (ele.type === 'linesegment') {
+            for (let conn_id of this.connections) {
+                var conn = this.cir_ele_map[conn_id];
+                var indx = -1;
+                for (var i = 0; i < conn.line_segments.length; i++) {
+                    var lns = conn.line_segments[i];
+                    if (lns.id === id) {
+                        indx = i;
+                        break;
+                    }
+                }
+                if (indx >= 0) {
+                    conn.line_segments.splice(indx, 1);
+                    if (conn.line_segments.length === 0) {
+                        delete this.cir_ele_map[conn_id];
+                        this.connections.splice(this.connections.indexOf(conn_id), 1);
+                        //this.cir_ele.splice(this.cir_ele.indexOf(conn_id), 1);
+                    } else {
+                        if (!this.split_connection(conn_id)) {
+                            conn.updateTerminalPts();
+                        }
+                    }
+                    break;
+                }
+            }
+            this.ln_segs.splice(this.ln_segs.indexOf(id), 1);
+            flag = true;
+        } else if (ele.type === 'jumper') {
+            for (let conn_id of this.connections) {
+                var conn = this.cir_ele_map[conn_id];
+                var indx = -1;
+                for (var i = 0; i < conn.line_segments.length; i++) {
+                    var lns = conn.line_segments[i];
+                    if (lns.id === id) {
+                        indx = i;
+                        break;
+                    }
+                }
+                if (indx >= 0) {
+                    conn.line_segments.splice(indx, 1);
+                    if (conn.line_segments.length === 0) {
+                        delete this.cir_ele_map[conn_id];
+                        this.connections.splice(this.connections.indexOf(conn_id), 1);
+                        //this.cir_ele.splice(this.cir_ele.indexOf(conn_id), 1);
+                    } else {
+                        if (!this.split_connection(conn_id)) {
+                            conn.updateTerminalPts();
+                        }
+                    }
+                    break;
+                }
+            }
+            this.ln_segs.splice(this.ln_segs.indexOf(id), 1);
+            this.jumpers.splice(this.jumpers.indexOf(id), 1);
+            flag = true;
+        }
+        delete this.cir_ele_map[id];
+        this.cir_ele.splice(this.cir_ele.indexOf(id), 1);
+
+        return flag;
+    }
+
     add_to_connection(line_segment) {
         var flag = false;
         var gflag = false;
@@ -1262,7 +1538,7 @@ class Circuit {
         var step = dot_gap;
         var x = 0;
         var y = 0;
-        if (line_segment.orientation === 'H') {
+        if (line_segment.direction === 'H') {
             loop_start = s_start_pt.x;
             loop_end = s_end_pt.x;
             y = s_start_pt.y;
@@ -1272,41 +1548,50 @@ class Circuit {
             loop_end = s_end_pt.y;
         }
 
+        //console.log("Source Con: " + line_segment.id + " Direction: " + line_segment.direction);
         if (line_segment instanceof Jumper) {
-            step = 2 * dot_gap;
+            step = loop_end - loop_start;
         }
+
         var conn_index = 0;
         var last_match_conn = -1;
-        var match_index = [];
+        var match_conn = [];
         for (let conn_id of this.connections) {
+            //console.log("Index: " + conn_index + "Target Con id: " + conn_id);
             var conn = this.cir_ele_map[conn_id];
             flag = false;
             for (let line of conn.line_segments) {
                 var c_start_pt = line.start_pt;
                 var c_end_pt = line.end_pt;
                 for (i = loop_start; i <= loop_end; i += step) {
-                    if (line_segment.orientation === 'H') {
+
+                    if (line_segment.direction === 'H') {
                         x = i;
                     } else {
                         y = i;
                     }
-                    if ((line instanceof LineSegment && ((line.orientation === 'H' && y === c_start_pt.y && x >= c_start_pt.x && x <= c_end_pt.x)
-                            || (line.orientation === 'V' && x === c_start_pt.x && y >= c_start_pt.y && y <= c_end_pt.y)))
-                            || (line instanceof Jumper && ((x === c_start_pt.x && y === c_start_pt.y)
-                                    || (x === c_end_pt.x && y === c_end_pt.y)))) {
+
+                    if (line instanceof LineSegment && ((x === c_start_pt.x && y >= c_start_pt.y && y <= c_end_pt.y) || (y === c_start_pt.y && x >= c_start_pt.x && x <= c_end_pt.x))) {
                         flag = true;
                         gflag = true;
+                    } else if (line instanceof Jumper && ((x === c_start_pt.x && y === c_start_pt.y) || (x === c_end_pt.x && y === c_end_pt.y))) {
+                        flag = true;
+                        gflag = true;
+                    }
+
+                    if (flag) {
+                        //console.log("x: " + x + " y: " + y + " c_start_pt.x: " + c_start_pt.x + " c_start_pt.y: " + c_start_pt.y + " c_end_pt.x: " + c_end_pt.x + " c_end_pt.y: " + c_end_pt.y);
+                        //console.log("Matched Conn: " + conn_id + " last_match_conn: " + last_match_conn);
+
                         if (last_match_conn === -1) {
                             last_match_conn = conn_id;
+                            line_segment.con_id = conn_id;
                             conn.line_segments.push(line_segment);
                             conn.updateTerminalPts();
                         } else {
                             this.cir_ele_map[last_match_conn].line_segments.push(...conn.line_segments); //add current conn to last match
                             this.cir_ele_map[last_match_conn].updateTerminalPts();
-                            match_index.push(conn_index);
-//                            this.connections.splice(conn_index, 1); //remove current conn 
-                            //this.cir_ele_map.delete(conn_id); //remove current conn   
-                            delete this.cir_ele_map[conn_id];
+                            match_conn.push(conn_id);
                         }
                         break;
                     }
@@ -1318,41 +1603,59 @@ class Circuit {
             conn_index += 1;
         }
 
-        for (let indx of match_index) {
-            this.connections.splice(indx, 1);
+        //remove matched connections except the first match
+        for (let conn_id of match_conn) {
+            const index = this.connections.indexOf(conn_id);
+            if (index > -1) { // only splice array when item is found
+                this.connections.splice(index, 1); // 2nd parameter means remove one item only
+            }
+            delete this.cir_ele_map[conn_id];
         }
 
         if (!gflag) {
             var line_segments = [];
+            line_segment.con_id = available_id;
             line_segments.push(line_segment);
-            var connection = new Connection(s_start_pt, s_end_pt, line_segments);
+            var connection = new Connection(line_segments);
+            //console.log("connection id: " + available_id);
+            connection.id = available_id;
+            available_id = available_id + 1;
             connection.updateTerminalPts();
             dc.add_new_connection(connection);
             flag = true;
         }
+
         return flag;
     }
 
     add_new_connection(conn)
     {
-        conn.id = available_id;
-        available_id = available_id + 1;
-        this.connections.push(conn.id);
-        this.cir_ele.push(conn.id);
+        var id = conn.id;
+        if (this.connections.indexOf(id) === -1) {
+            this.connections.push(id);
+        }
+//        if (this.cir_ele.indexOf(id) === -1) {
+//            this.cir_ele.push(id);
+//        }
         this.cir_ele_map[conn.id] = conn;
     }
 
     draw_connections()
     {
         for (let id of this.connections) {
+            //console.log("conn id: " + id);
             var conn = this.cir_ele_map[id];
             conn.draw_connection(this.ctx);
         }
     }
 
     add_jumper(jumper) {
-        this.jumpers.push(jumper.id);
-        this.cir_ele.push(jumper.id);
+        if (this.jumpers.indexOf(jumper.id) === -1) {
+            this.jumpers.push(jumper.id);
+        }
+        if (this.cir_ele.indexOf(jumper.id) === -1) {
+            this.cir_ele.push(jumper.id);
+        }
         this.cir_ele_map[jumper.id] = jumper;
     }
 
@@ -1475,7 +1778,7 @@ class Circuit {
                 var start_pt = seg.start_pt;
                 var end_pt = seg.end_pt;
                 var l, r, t, b;
-                if (seg.orientation === 'H' || seg.direction === 'H') {
+                if (seg.direction === 'H') {
                     l = start_pt.x - (dot_width / 2);
                     r = end_pt.x + (dot_width / 2);
                     t = start_pt.y - (dot_width / 2);
@@ -1602,112 +1905,42 @@ class Circuit {
 
     delete_selected() {
         var flag = false;
-        for (let id of this.cir_ele) {
+        var id_list = Object.keys(this.cir_ele_map);
+        for (let id of id_list) {
+            id = parseInt(id);
             var ele = this.cir_ele_map[id];
-            if (ele.sel_flag) {
+            if (ele.sel_flag === true) {
+                console.log("selected ele: " + ele.type + " id: " + id + " sel_flag: " + ele.sel_flag);
                 if (ele.type === 'connection') {
                     this.connections.splice(this.connections.indexOf(id), 1);
+                    flag = true;
                 } else if (ele.type === 'chip') {
                     this.chips.splice(this.chips.indexOf(id), 1);
+                    flag = true;
                 } else if (ele.type === 'memory') {
                     this.memory_bits.splice(this.memory_bits.indexOf(id), 1);
+                    flag = true;
                 } else if (ele.type === 'inbit' || ele.type === 'outbit') {
                     this.bits.splice(this.bits.indexOf(id), 1);
                     this.inbit_pts.splice(this.inbit_pts.indexOf(id), 1);
                     this.outbit_pts.splice(this.outbit_pts.indexOf(id), 1);
+                    flag = true;
                 } else if (ele.type === 'component') {
                     this.components.splice(this.components.indexOf(id), 1);
+                    flag = true;
                 } else if (ele.type === 'clock') {
                     this.clock_id = null;
+                    flag = true;
                 }
-                delete this.cir_ele_map[id];
-                this.cir_ele.splice(this.cir_ele.indexOf(id), 1);
-                flag = true;
-                break;
-            }
-        }
-        return flag;
-    }
-
-    delete_last() {
-        var flag = false;
-        var id = this.cir_ele[this.cir_ele.length - 1];
-        var ele = this.cir_ele_map[id];
-        if (ele.type === 'connection') {
-            this.connections.splice(this.connections.indexOf(id), 1);
-            flag = true;
-        } else if (ele.type === 'chip') {
-            this.chips.splice(this.chips.indexOf(id), 1);
-            flag = true;
-        } else if (ele.type === 'memory') {
-            this.memory_bits.splice(this.memory_bits.indexOf(id), 1);
-            flag = true;
-        } else if (ele.type === 'inbit' || ele.type === 'outbit') {
-            this.bits.splice(this.bits.indexOf(id), 1);
-            this.inbit_pts.splice(this.inbit_pts.indexOf(id), 1);
-            this.outbit_pts.splice(this.outbit_pts.indexOf(id), 1);
-            flag = true;
-        } else if (ele.type === 'component') {
-            this.components.splice(this.components.indexOf(id), 1);
-            flag = true;
-        } else if (ele.type === 'clock') {
-            this.clock = null;
-            flag = true;
-        } else if (ele.type === 'linesegment') {
-            for (let conn_id of this.connections) {
-                var conn = this.cir_ele_map[conn_id];
-                var indx = -1;
-                for (var i = 0; i < conn.line_segments.length; i++) {
-                    var lns = conn.line_segments[i];
-                    if (lns.id === id) {
-                        indx = i;
-                        break;
-                    }
-                }
-                if (indx >= 0) {
-                    conn.line_segments.splice(indx, 1);
-                    if (conn.line_segments.length === 0) {
-                        delete this.cir_ele_map[conn_id];
-                        this.connections.splice(this.connections.indexOf(conn_id), 1);
-                        this.cir_ele.splice(this.cir_ele.indexOf(conn_id), 1);
-                    } else {
-                        conn.updateTerminalPts();
+                if (flag) {
+                    delete this.cir_ele_map[id];
+                    if (this.cir_ele.indexOf(id) >= 0) {
+                        this.cir_ele.splice(this.cir_ele.indexOf(id), 1);
                     }
                     break;
                 }
             }
-            this.ln_segs.splice(this.ln_segs.indexOf(id), 1);
-            flag = true;
-        } else if (ele.type === 'jumper') {
-            for (let conn_id of this.connections) {
-                var conn = this.cir_ele_map[conn_id];
-                var indx = -1;
-                for (var i = 0; i < conn.line_segments.length; i++) {
-                    var lns = conn.line_segments[i];
-                    if (lns.id === id) {
-                        indx = i;
-                        break;
-                    }
-                }
-                if (indx >= 0) {
-                    conn.line_segments.splice(indx, 1);
-                    if (conn.line_segments.length === 0) {
-                        delete this.cir_ele_map[conn_id];
-                        this.connections.splice(this.connections.indexOf(conn_id), 1);
-                        this.cir_ele.splice(this.cir_ele.indexOf(conn_id), 1);
-                    } else {
-                        conn.updateTerminalPts();
-                    }
-                    break;
-                }
-            }
-            this.ln_segs.splice(this.ln_segs.indexOf(id), 1);
-            this.jumpers.splice(this.jumpers.indexOf(id), 1);
-            flag = true;
         }
-        delete this.cir_ele_map[id];
-        this.cir_ele.splice(this.cir_ele.indexOf(id), 1);
-
         return flag;
     }
 
@@ -1926,6 +2159,7 @@ class Circuit {
     }
 
     save_as_component(name, pin_desc) {
+        alert("name: " + name + " pin_desc: " + pin_desc);
         this.name = name;
         this.pin_desc = pin_desc;
         var inpin_json = {};
@@ -2044,14 +2278,8 @@ class Component extends Circuit {
                         }
                         this.components.push(id);
                     } else if (type === 'connection') {
-                        let st_pt = {};
-                        st_pt.x = ele_data.start_pt.x;
-                        st_pt.y = ele_data.start_pt.y;
-                        let end_pt = {};
-                        end_pt.x = ele_data.end_pt.x;
-                        end_pt.y = ele_data.end_pt.y;
                         let ls = [];
-                        ele = new Connection(st_pt, end_pt, ls);
+                        ele = new Connection(ls);
                         ele.id = ele_data.id;
                         ele.last_flag = ele_data.last_flag;
                         ele.association = ele_data.association;
@@ -2079,13 +2307,18 @@ class Component extends Circuit {
                     }
                     if (type !== 'linesegment' && ele !== null) {
                         //console.log("new component ele_id: " + id + " ele: " + ele.type);
-                        this.cir_ele.push(id);
+                        if (this.cir_ele.indexOf(id) === -1 && type !== 'connection') {
+                            this.cir_ele.push(id);
+                        }
                         this.cir_ele_map[id] = ele;
                     }
                 }
             }
         }
 
+        if (json.name !== undefined) {
+            this.name = json.name;
+        }
         if (json.pin_desc !== undefined) {
             this.pin_desc = json.pin_desc;
         }
@@ -2359,20 +2592,16 @@ let mouse_down = function (e) {
         }
         nr_dot = {};
     }
-//    //console.log("isConnecting: " + is_connecting + "l_jumper:" + l_jumper + " r_jumper:" + r_jumper);
 };
 let mouse_up = function (e) {
-//    //console.log("isConnecting: " + is_connecting + " isDragging:" + is_dragging);
     if (!is_dragging && !is_connecting) {
         return;
     }
     e.preventDefault();
     if (is_dragging && dragging_chip) {
-//        //console.log("releasing chip");
         var chip = dc.cir_ele_map[drag_chip_index];
         var x = chip.x;
         var y = chip.y;
-//        //console.log(" up_x: " + x + " up_y: " + y);
         var nr_pt = nearest_dot(x, y);
         chip.x = nr_pt.x + (dot_width / 2);
         chip.y = nr_pt.y - ((dot_height / 2) + chip_padding);
@@ -2382,17 +2611,13 @@ let mouse_up = function (e) {
             in_pin.x = in_pin.x + dx;
             in_pin.y = in_pin.y + dy;
         }
-//        //console.log("releasing chip ch1");
 
         for (let out_pin of chip.out_pins) {
             out_pin.x = out_pin.x + dx;
             out_pin.y = out_pin.y + dy;
         }
-//        //console.log("releasing chip ch2");
         dc.redraw();
-//        //console.log("releasing chip ch3");
     } else if (is_dragging && dragging_component) {
-//        //console.log(" is_dragging: " + is_dragging + " dragging_component: " + dragging_component);
         var comp = dc.cir_ele_map[drag_comp_index];
         var x = comp.x;
         var y = comp.y;
@@ -2436,15 +2661,12 @@ let mouse_up = function (e) {
         var new_pos = getMousePos(e);
         var new_x = new_pos.x;
         var new_y = new_pos.y;
-        //var new_x = new_pos.x - 9;
-        //var new_y = new_pos.y - 9;
         if (dc.position_in_dot(new_x, new_y) && (!(nr_dot.x === start_dot.x && nr_dot.y === start_dot.y))
                 && ((nr_dot.x === start_dot.x && nr_dot.y !== start_dot.y) || (nr_dot.x !== start_dot.x && nr_dot.y === start_dot.y))) {
-//            //console.log("end position");
             var end_pt = {};
             end_pt.x = nr_dot.x;
             end_pt.y = nr_dot.y;
-            if ((l_jumper || r_jumper) && (start_dot.x === end_pt.x && Math.abs(start_dot.y - end_pt.y) === 2 * dot_gap)) {
+            if ((l_jumper || r_jumper) && (start_dot.x === end_pt.x && Math.abs(start_dot.y - end_pt.y) >= 2 * dot_gap)) {
                 if (start_dot.y > end_pt.y) {
                     var tmp;
                     tmp = start_dot.y;
@@ -2453,18 +2675,17 @@ let mouse_up = function (e) {
                 }
                 var jumper;
                 if (l_jumper) {
-                    jumper = new Jumper(available_id, start_dot.x, start_dot.y, 'V', 'L');
+                    jumper = new Jumper(available_id, start_dot.x, start_dot.y, end_pt.x, end_pt.y, 'V', 'L');
                     jumper.type = 'jumper';
                 } else {
-                    jumper = new Jumper(available_id, start_dot.x, start_dot.y, 'V', 'R');
+                    jumper = new Jumper(available_id, start_dot.x, start_dot.y, end_pt.x, end_pt.y, 'V', 'R');
                     jumper.type = 'jumper';
                 }
                 available_id = available_id + 1;
                 dc.add_line_segment(jumper);
                 dc.add_jumper(jumper);
                 var flag = dc.add_to_connection(jumper);
-//                //console.log("jumper add_to_connection flag:" + flag);
-            } else if ((l_jumper || r_jumper) && (start_dot.y === end_pt.y && Math.abs(start_dot.x - end_pt.x) === 2 * dot_gap)) {
+            } else if ((l_jumper || r_jumper) && (start_dot.y === end_pt.y && Math.abs(start_dot.x - end_pt.x) >= 2 * dot_gap)) {
                 if (start_dot.x > end_pt.x) {
                     var tmp;
                     tmp = start_dot.x
@@ -2473,22 +2694,21 @@ let mouse_up = function (e) {
                 }
                 var jumper;
                 if (l_jumper) {
-                    jumper = new Jumper(available_id, start_dot.x, start_dot.y, 'H', 'L');
+                    jumper = new Jumper(available_id, start_dot.x, start_dot.y, end_pt.x, end_pt.y, 'H', 'L');
                     jumper.type = 'jumper';
                 } else {
-                    jumper = new Jumper(available_id, start_dot.x, start_dot.y, 'H', 'R');
+                    jumper = new Jumper(available_id, start_dot.x, start_dot.y, end_pt.x, end_pt.y, 'H', 'R');
                     jumper.type = 'jumper';
                 }
                 available_id = available_id + 1;
                 dc.add_line_segment(jumper);
                 dc.add_jumper(jumper);
                 var flag = dc.add_to_connection(jumper);
-//                //console.log("jumper add_to_connection flag:" + flag);
             } else {
                 var ln_segment = new LineSegment(available_id, start_dot, end_pt);
                 ln_segment.type = 'linesegment';
                 available_id = available_id + 1;
-                if (ln_segment.orientation === 'H') {
+                if (ln_segment.direction === 'H') {
                     if (ln_segment.start_pt.x > ln_segment.end_pt.x) {
                         var tmp = ln_segment.start_pt.x;
                         ln_segment.start_pt.x = ln_segment.end_pt.x;
@@ -2659,6 +2879,7 @@ let mouse_dblClick = function (e) {
     if (dc.clicked_on_component(x, y)) {
         var comp = dc.cir_ele_map[drag_comp_index];
         var com_name = comp.name;
+        alert("com_name: " + com_name);
         var pin_desc = comp.pin_desc;
         var inpin_map = comp.inpin_map;
         var outpin_map = comp.outpin_map;
@@ -2706,6 +2927,7 @@ function load_circuit(json) {
     available_id = Math.max(...json.cir_ele);
     dc.memory = json.memory;
     dc.name = json.name;
+    console.log("Object.keys(json.cir_ele_map): " + Object.keys(json.cir_ele_map).length);
     if (json.cir_ele_map !== undefined) {
         for (let key of Object.keys(json.cir_ele_map)) {
             var ele_data = json.cir_ele_map[key];
@@ -2765,15 +2987,9 @@ function load_circuit(json) {
                         }
                     }
                     dc.components.push(id);
-                } else if (type === 'connection') {
-                    let st_pt = {};
-                    st_pt.x = ele_data.start_pt.x;
-                    st_pt.y = ele_data.start_pt.y;
-                    let end_pt = {};
-                    end_pt.x = ele_data.end_pt.x;
-                    end_pt.y = ele_data.end_pt.y;
+                } else if (type === 'connection') {                    
                     let ls = [];
-                    ele = new Connection(st_pt, end_pt, ls);
+                    ele = new Connection(ls);
                     ele.id = ele_data.id;
                     var ls_list = ele_data.line_segments;
                     for (let ls of ls_list) {
@@ -2783,9 +2999,11 @@ function load_circuit(json) {
                         var ls_obj = null;
                         if (ls.type === 'linesegment') {
                             ls_obj = new LineSegment(ls_id, ls_start_pt, ls_end_pt);
+                            ls_obj.con_id = ele.id;
                             dc.ln_segs.push(ls_id);
                         } else {
-                            ls_obj = new Jumper(ls_id, ls_start_pt.x, ls_start_pt.y, ls.direction, ls.orientation);
+                            ls_obj = new Jumper(ls_id, ls_start_pt.x, ls_start_pt.y, ls_end_pt.x, ls_end_pt.y, ls.direction, ls.orientation);
+                            ls_obj.con_id = ele.id;
                             dc.ln_segs.push(ls_id);
                             dc.jumpers.push(ls_id);
                         }
@@ -2815,16 +3033,14 @@ function load_circuit(json) {
                     dc.clock_id = id;
                 }
 
-//                else if (type === 'linesegment') {
-//                    ele = new Linesegment(id, ele_data.start_pt, ele_data.end_pt);                    
-//                } else if (type === 'jumper') {
-//                    ele = new Jumper(id, ele_data.start_pt, ele_data.end_pt, ele_data.direction, ele_data.orientation);                     
-//                }
-
                 if (ele !== null) {
-                    dc.cir_ele.push(id);
+                    console.log("type: " + type + " id: " + id);
+                    if (dc.cir_ele.indexOf(id) === -1 && type !== 'connection') {
+                        dc.cir_ele.push(id);
+                    }
                     dc.cir_ele_map[id] = ele;
                 }
+                console.log("size: " + dc.cir_ele.length);
             }
         }
     }
@@ -2957,7 +3173,7 @@ $(document).ready(function () {
     function loop_clock(clock, count, i, val) {
         setTimeout(function () {
             if (i <= count * 2) {
-                console.log('cycle: ' + i);
+                //console.log('cycle: ' + i);
                 clock.val = val;
                 dc.redraw();
                 if (((clock.trigger === '1' || clock.trigger === '3') && val === '1') || ((clock.trigger === '2' || clock.trigger === '4') && val === 0)) {
