@@ -173,6 +173,7 @@ class Bit extends Element {
     type = 'bit';
     label = 'bit';
     sel_flag = false;
+    
     constructor(id, x, y) {
         super();
         var nr_pt = nearest_dot(x, y);
@@ -893,7 +894,6 @@ class Circuit {
 
     draw_components() {
         for (let id of this.components) {
-            console.log("comp id: " + id);
             var comp = this.cir_ele_map[id];
             comp.draw_component(this.ctx);
         }
@@ -923,7 +923,7 @@ class Circuit {
     add_memory(bit) {
         var id = bit.id;
         if (this.memory_bits.indexOf(id) === -1) {
-            this.memory_bits.push(id);
+            this.memory_bits.push(id);   
         }
         if (this.cir_ele.indexOf(id) === -1) {
             this.cir_ele.push(id);
@@ -943,6 +943,7 @@ class Circuit {
     }
 
     draw_bits() {
+        //alert("Bits size: " + this.bits.length);
         for (let id of this.bits) {
             var bit = this.cir_ele_map[id];
             bit.draw_bit(this.ctx);
@@ -952,7 +953,6 @@ class Circuit {
     draw_memory_bits() {
         for (let id of this.memory_bits) {
             var bit = this.cir_ele_map[id];
-            //console.log("bit type: " + bit.type);
             bit.draw_memory(this.ctx);
         }
     }
@@ -960,9 +960,9 @@ class Circuit {
     add_clock(clock) {
         this.clock_id = clock.id;
         var id = clock.id;
-        if (this.bits.indexOf(id) === -1) {
-            this.bits.push(id);
-        }
+//        if (this.bits.indexOf(id) === -1) {
+//            this.bits.push(id);
+//        }
         if (this.cir_ele.indexOf(id) === -1) {
             this.cir_ele.push(id);
         }
@@ -993,7 +993,7 @@ class Circuit {
             }
         }
 
-        if (!flag) {
+        if (!flag) {            
             for (let bit_id of this.memory_bits) {
                 var bit = this.cir_ele_map[bit_id];
                 if ((x === bit.outpt.x && y === bit.outpt.y) || (x === bit.inpt.x && y === bit.inpt.y)) {
@@ -1006,6 +1006,8 @@ class Circuit {
                     flag = true;
                     break;
                 }
+                
+                
 //                else if (x === bit.inpt.x && y === bit.inpt.y) {
 //                    if (conn.association.indexOf(bit.id) === -1) {
 //                        conn.association.push(bit.id);
@@ -1013,7 +1015,7 @@ class Circuit {
 //                    flag = true;
 //                    break;
 //                }
-            }
+            }            
         }
 
         if (!flag) {
@@ -1400,7 +1402,7 @@ class Circuit {
                             } else if (line instanceof Jumper && ((x === c_start_pt.x && y === c_start_pt.y) || (x === c_end_pt.x && y === c_end_pt.y))) {
                                 flag = true;
                                 gflag = true;
-                                console.log("line_id: " + line_id + " flag2: " + flag);
+                                //console.log("line_id: " + line_id + " flag2: " + flag);
                             }
 
                             if (flag) {
@@ -1414,11 +1416,11 @@ class Circuit {
                     }
                 }
             }
-            console.log("new_set: " + new_set.length);
+            //console.log("new_set: " + new_set.length);
             conn_map.push(new_set);
         }
 
-        console.log("conn_map.length: " + conn_map.length);
+        //console.log("conn_map.length: " + conn_map.length);
         if (conn_map.length > 1) {
             //conn_map.forEach((value, key) => {
             for (var i = 0; i < conn_map.length; i++) {
@@ -1444,7 +1446,7 @@ class Circuit {
         var flag = false;
         var id = this.cir_ele[this.cir_ele.length - 1];
         var ele = this.cir_ele_map[id];
-        console.log("Delete Ele Type: " + ele.type + " Ele.id: " + id);
+        //console.log("Delete Ele Type: " + ele.type + " Ele.id: " + id);
         if (ele.type === 'connection') {
             this.connections.splice(this.connections.indexOf(id), 1);
             flag = true;
@@ -1910,7 +1912,7 @@ class Circuit {
             id = parseInt(id);
             var ele = this.cir_ele_map[id];
             if (ele.sel_flag === true) {
-                console.log("selected ele: " + ele.type + " id: " + id + " sel_flag: " + ele.sel_flag);
+                //console.log("selected ele: " + ele.type + " id: " + id + " sel_flag: " + ele.sel_flag);
                 if (ele.type === 'connection') {
                     this.connections.splice(this.connections.indexOf(id), 1);
                     flag = true;
@@ -2927,7 +2929,7 @@ function load_circuit(json) {
     available_id = Math.max(...json.cir_ele);
     dc.memory = json.memory;
     dc.name = json.name;
-    console.log("Object.keys(json.cir_ele_map): " + Object.keys(json.cir_ele_map).length);
+    //console.log("Object.keys(json.cir_ele_map): " + Object.keys(json.cir_ele_map).length);
     if (json.cir_ele_map !== undefined) {
         for (let key of Object.keys(json.cir_ele_map)) {
             var ele_data = json.cir_ele_map[key];
@@ -3034,13 +3036,13 @@ function load_circuit(json) {
                 }
 
                 if (ele !== null) {
-                    console.log("type: " + type + " id: " + id);
+                    //console.log("type: " + type + " id: " + id);
                     if (dc.cir_ele.indexOf(id) === -1 && type !== 'connection') {
                         dc.cir_ele.push(id);
                     }
                     dc.cir_ele_map[id] = ele;
                 }
-                console.log("size: " + dc.cir_ele.length);
+                //console.log("size: " + dc.cir_ele.length);
             }
         }
     }
@@ -3159,13 +3161,14 @@ $(document).ready(function () {
                 for (let id of conn.association) {
                     var assoc = dc.cir_ele_map[id];
                     if (assoc.type === 'InPin' || assoc.type === 'outbit' || assoc.type === 'memory') {
-                        assoc.val = conn.val;
+                        assoc.val = conn.val;                        
                     }
                 }
             }
         }
         dc.redraw();
     });
+    
     $("#reset_val_btn").on('click', function () {
         dc.reset_circuit();
         dc.redraw();
