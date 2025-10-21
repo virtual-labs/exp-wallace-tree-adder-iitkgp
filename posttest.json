@@ -1,0 +1,50 @@
+{
+    "version": 2.0,
+    "questions": [
+      {
+        "question": "The number of edges in a tree with n nodes",
+        "answers": {
+          "a": "n+1",
+          "b": "n-1",
+          "c": "2n",
+          "d": "n"
+        },
+        "correctAnswer": "b",
+        "difficulty": "beginner"
+      },
+      {
+        "question": "what is the number of full adders and half adders needed to add 16-bit numbers?",
+        "answers": {
+          "a": "5 full adder, 1 half adder",
+          "b": "5 full adder, 5 half adder",
+          "c": "12 full adder, 4 half adder",
+          "d": "None of these"
+        },
+        "correctAnswer": "c",
+        "difficulty": "beginner"
+      },
+      {
+        "question": "How many gate levels are propagated by the carry in an m-bit parallel adder?",
+        "answers": {
+          "a": "m",
+          "b": "m+1",
+          "c":"2m",
+          "d":"None of these"
+        },
+        "correctAnswer": "c",
+        "difficulty": "beginner"
+      },
+      {
+        "question": "How many full adders are needed to design an n-bit parallel adder?",
+        "answers": {
+          "a": "n",
+          "b": "n-1",
+          "c": "n+2",
+          "d": "n/2"
+        },
+        "correctAnswer": "a",
+        "difficulty": "beginner"
+      }
+    ]
+  }
+  

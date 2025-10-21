@@ -1,0 +1,61 @@
+{
+    "version": 2.0,
+    "questions": [
+      {
+        "question": "What is the main difference between half-adders and full-adders?",
+        "answers": {
+          "a": "Nothing basically; full-adders are made up of two half-adders",
+          "b": "Full-adders can handle double digit numbers",
+          "c": "Full-adders have a carry input capability",
+          "d": "Half-adders can only handle single digit numbers"
+        },
+        "correctAnswer": "c",
+        "difficulty": "beginner"
+      },
+      {
+        "question": "Carry look ripple delay is eliminated in?",
+        "answers": {
+          "a": "Full adder",
+          "b": "Half adder",
+          "c": "Parallel adder",
+          "d": "Carry look ahead adder"
+        },
+        "correctAnswer": "c",
+        "difficulty": "beginner"
+      },
+      {
+        "question": "Parallel adder is",
+        "answers": {
+          "a": "Combinational circuit",
+          "b": "Sequential circuit",
+          "c": "Both",
+          "d": "None of these"
+        },
+        "correctAnswer": "a",
+        "difficulty": "beginner"
+      },
+      {
+        "question": "Which one of the following will give the sum of full adders as output?",
+        "answers": {
+          "a": "Three bit parity checker",
+          "b": "Three point majority circuit",
+          "c": "Three bit counter",
+          "d": "Three bit comparator"
+        },
+        "correctAnswer": "c",
+        "difficulty": "beginner"
+      },
+      {
+        "question": "A full binary tree with n leaf nodes contains",
+        "answers": {
+          "a": "2n nodes",
+          "b": "(n+1) nodes",
+          "c": "n nodes",
+          "d": "(2n-1) nodes"
+        },
+        "correctAnswer": "d",
+        "difficulty": "beginner"
+      }
+    ]
+  }
+  

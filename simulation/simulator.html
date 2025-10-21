@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Web simulator</title>		
+        <meta name="viewport" content="width=device-width">  
+        
+        <!--<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">-->
+        <style>
+            .node {
+                display:inline-flex;
+            }
+            .switch {
+                display:inline-flex;
+            }
+            .action {
+                display:inline-flex;
+            }
+            .float-container {
+                position: absolute;
+                display: grid;
+                width: 100%;
+                grid-template-columns: 70% 30%;
+                grid-gap: 20px;
+            }
+            .float-child1 {
+                position: relative;
+                overflow: scroll;
+                height: 600px;
+                width: 100%;
+            }
+            /*            .float-child2 {
+                            position: relative;
+                        }*/
+            /*            canvas {
+                            position: relative;
+                        }*/
+            .stack {
+                position:relative;
+            }
+            .stack canvas {
+                position:absolute;
+                left:0;
+                top:0;
+            }
+            .adi{
+                text-align: center;
+                width: 90em;
+            }
+
+        </style>
+    </head>
+    <body>
+        <div class="adi">
+                    <h2> Follow the below manual and perform the experiment </h2>
+                    <h2><b> Manual --> <a href="./coavlNew.pdf" target="_blank">Click Here</a> </b> to download</h2><br>
+            
+        </div><br>
+
+        <div class="float-container">
+            <div class="stack float-child1">
+                <canvas id="bb_canvas" width="1500" height="1000" style="border: 1px solid black;">
+                    Your browser does not support the HTML 5 Canvas. 
+                </canvas>
+                <canvas id="dc_canvas" width="1500" height="1000" style="border: 1px solid black;">
+                    Your browser does not support the HTML 5 Canvas. 
+                </canvas>                
+            </div>
+            <div class="float-child2">
+                <div id="menu" class="menu">
+                    <!--			<div class="closebutton" onclick="togglemenu(this)">
+                                                    Pallette
+                                            </div>
+                    -->			
+                    <div class="menusection">
+                        <div class="section">Inputs-Outputs</div>
+                        <div id="BITSwitch" class="switch"><input type="button" value="BITSwitch" /></div>
+                        <div id="BITDisplay" class="switch"><input type="button" value="BITDisplay" /></div>
+                        <div id="Memory" class="switch"><input type="button" value="Memory" /></div>
+                    </div>
+                    <hr/>
+                    <div class="menusection">
+                        <div class="section">Logic Gates</div>
+                        <!-- <div id="OR" class="node"/> background-image="images/Or-gate-en.svg" width="50" height="50"></div> -->
+                        <div id="OR" class="node"><input type="button" value="OR" /></div>
+                        <div id="NOR" class="node"><input type="button" value="NOR" /></div>
+                        <div id="XOR" class="node"><input type="button" value="XOR" /></div>
+                        <div id="XNOR" class="node"><input type="button" value="XNOR" /></div>
+                        <div id="AND" class="node"><input type="button" value="AND" /></div>
+                        <div id="NAND" class="node"><input type="button" value="NAND" /></div>
+                        <div id="NOT" class="node"><input type="button" value="NOT" /></div>                        
+                    </div>
+                    <hr/>                    
+                    <div class="menusection">
+                        <div class="section">Clock</div>
+                        <div>
+                            <label for="high_period">High(sec):</label>
+                            <input id="high_period" type="text" style="width:50px"/>
+                            <label for="low_period">Low(sec)</label>
+                            <input id="low_period" type="text" style="width:50px"/><br/> 
+                            <div>
+                                <label for="p_level">+level trigger<input name="trigger" id="p_level" value = "1" type="radio"></label>
+                                <label for="n_level">-level trigger<input name="trigger" id="n_level" value = "2"  type="radio"></label>
+                                <label for="p_edge">+edge trigger<input name="trigger" id="p_edge" value = "3" type="radio"></label>
+                                <label for="n_edge">-edge trigger<input name="trigger" id="n_edge" value = "4" type="radio"></label>
+                            </div>
+                            <input type="button" id="add_clock" value="Add Clock" />  
+                        </div>                        
+                    </div>
+                    <hr/>
+<!--                    <div class="menusection">
+                        <div>
+                            <label for="curr_memory">Memory:<input type="text" id="curr_memory" value = "" style="width:50px"/></label>
+                            <label for="hold_state">Hold State<input name="memory" id="hold_state" value = "1" type="radio"></label>
+                            <label for="clear_state">Clear State<input name="memory" id="clear_state" value = "0"  type="radio"></label>
+                            <input type="button" id="add_memory" value="Set/Clear Memory" /> 
+                        </div>
+                    </div>-->
+                    <hr/>
+                    <div class="menusection">
+                        <div>
+                            <label>Current Value:</label>  
+                            <input id="conn_id" type="text"/>
+                            <input id="conn_val" type="text"/>  
+                        </div>
+                        <div>
+                            <label for="init_val">Set Value</label>  
+                            <input id="init_val" type="text"/>
+                            <button id="set_val_btn">Set</button> 
+                            <button id="reset_val_btn">reset circuit</button> 
+                        </div>
+                    </div>
+                    <hr/>
+                    <div class="menusection">
+                        <div class="section">Add Component</div>   
+                        <input type="file" id="inputfile">
+                        <br>
+                        <!-- button to start reading the file -->
+                        <button id="add-component-button">Add Component</button>
+                        <!-- file contents will be placed here -->
+                        <button id="load-circuit-button">Load Circuit</button>
+                        <pre id="file-content"></pre>
+                        <input type ='hidden' id="data"/>
+                    </div>
+                    <hr/>
+                    <div class="menusection">
+                        <div class="section">Action</div> 
+                        <input id="sim_btn" type = "button" value="Start Simulation" />
+                        <label> &nbsp; OR &nbsp;</label>                        
+                        <label for="no_of_cycles">Pulses#</label>
+                        <input id="no_of_cycles" type="text"/>
+                        <input type="button" id="start_clock" value="Trigger Clock" />  
+                    </div> 
+                    <hr/>
+                    <div class="menusection">
+                        <div class="comp_meta">
+                            <div class="section">
+                                <label for="comp_name">Comp Name</label> 
+                                <input id="comp_name" type="text"/>                            
+                                <label for="pin_desc">PIN Desc</label>     
+                                <textarea id="pin_desc"></textarea>
+                            </div>
+                            <div id="save_dc_btn" class="action">
+                                <input type="button" value="Save As Component" />
+                            </div> 
+                            <hr/>
+                            <div class="section">
+                                <label for="comp_name_out">View PIN Details for: </label>
+                                <input id="comp_name_out" type="text" readonly/><br/>
+                                <label for="pin_desc_out">PIN Map</label>
+                                <textarea id="pin_desc_out" readonly></textarea>
+                                <label for="pin_map">PIN Desc</label>
+                                <textarea id="pin_map" readonly></textarea>
+                            </div>
+                        </div>                        
+                    </div>
+                </div>
+            </div>
+        </div><br>
+        
+        <!--<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" ></script>-->
+        <script src="js/jquery-3.4.1.js"></script>
+        <script src="js/FileSaver.js"></script>
+        <script src="js/canvas.js"></script>
+        <script type="text/javascript">
+            $(document).ready(function () {
+                document.getElementById('inputfile')
+                        .addEventListener('change', function () {
+                            var fr = new FileReader();
+                            fr.readAsText(this.files[0]);
+                            fr.onload = function () {
+                                //document.getElementById("file-content").textContent = fr.result;
+                                document.getElementById('data').value = fr.result;
+                            };
+                            //fr.readAsText(this.files[0]);
+                        });
+            });
+        </script>
+    </body>
+</html>
