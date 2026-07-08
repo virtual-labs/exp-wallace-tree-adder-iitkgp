@@ -54,7 +54,7 @@ l_jumper = false;
 r_jumper = false;
 high_clock = null;
 low_clock = null;
-
+already_evaluated = [];
 
 function sleep(time) {
     return new Promise((resolve) => setTimeout(resolve, time));
@@ -164,16 +164,19 @@ class Element {
     id = -1;
     type = 'element';
     label = 'element';
+    parent_id = -1;
+    child_ids = [];
 }
 
 class Bit extends Element {
     color = 'grey';
-    val = -1;
+    val = -5;
     id = -1;
     type = 'bit';
     label = 'bit';
     sel_flag = false;
-    
+    parent_id = -1;
+
     constructor(id, x, y) {
         super();
         var nr_pt = nearest_dot(x, y);
@@ -220,6 +223,8 @@ class In_Bit extends Bit {
     association = [];
     type = 'inbit';
     val = 1;
+    parent_id = -1;
+
     constructor(id, x, y) {
         super(id, x, y);
         this.val = 1;
@@ -230,20 +235,30 @@ class In_Bit extends Bit {
         if (this.val === 1) {
             this.val = 0;
             this.color = 'red';
+        } else if (this.val === 0) {
+            this.val = -5;
+            this.color = 'grey';
         } else {
             this.val = 1;
             this.color = 'green';
         }
+    }
+
+    bit_evaluate() {
+        //console.log("bit id: " + this.id + " val: " + this.val + " Assoc: " + this.association.length);
+        return true;
     }
 }
 
 class Out_Bit extends Bit {
     association = [];
     type = 'outbit';
-    val = -1;
+    val = -5;
+    parent_id = -1;
+
     constructor(id, x, y) {
         super(id, x, y);
-        this.val = -1;
+        this.val = -5;
     }
 
     draw_bit(ctx) {
@@ -278,12 +293,14 @@ class Dot {
 class Pin extends Element {
     chip_id = -1;
     number = -1;
-    val = -1;
+    val = -5;
     id = -1;
     type = 'pin';
     label = 'pin';
     association = [];
     clock_flag = false;
+    parent_id = -1;
+
     constructor(id, x, y) {
         super();
         this.id = id;
@@ -327,11 +344,15 @@ class Pin extends Element {
 
 class Clock extends Element {
     type = 'clock';
-    val = -1;
+    val = -5;
     association = [];
     id = -1;
     sel_flag = false;
-    constructor(id, x, y, high, low, trigger) {
+    parent_id = -1;
+    edge_flag = 1;
+    already_triggered = 0;
+
+    constructor(id, x, y, high, low) {
         super();
         this.id = id;
         var nr_pt = nearest_dot(x, y);
@@ -341,7 +362,6 @@ class Clock extends Element {
         this.y = y;
         this.high = high;
         this.low = low;
-        this.trigger = trigger;
     }
 
     draw_clock(ctx) {
@@ -363,23 +383,42 @@ class Clock extends Element {
             ctx.fillStyle = 'white';
         }
         ctx.fill();
+        ctx.fillStyle = "black";
+        ctx.font = "20px sans-serif";
+        ctx.fillText(this.id, this.x - (dot_gap / 4), this.y - (dot_gap / 2));
+        ctx.font = "10px sans-serif";
         if (this.sel_flag) {
             drawStar(ctx, this.x, this.y);
             drawStar(ctx, this.x - (dot_gap / 2), this.y - (dot_gap / 2));
             drawStar(ctx, this.x - (dot_gap / 2), this.y + (dot_gap / 2));
         }
     }
+
+    bit_evaluate() {
+        console.log("bit id: " + this.id + " val: " + this.val + " Assoc: " + this.association.length);
+        return true;
+    }
+
+    change_val() {
+        if (this.edge_flag === 1 && this.already_triggered === 0) {
+            this.val = this.val === 1 ? 0 : (this.val === 0 ? 1 : this.val);
+            this.already_triggered = 1;
+        }
+    }
 }
 
-class Memory {
+class Memory extends Element {
     id = -1;
     inpt = {};
     outpt = {};
-    val = -1;
+    val = -5;
     association = [];
     sel_flag = false;
     type = 'memory';
+    parent_id = -1;
+
     constructor(id, x, y) {
+        super();
         this.id = id;
         var nr_pt = nearest_dot(x, y);
         this.inpt = nr_pt;
@@ -409,14 +448,37 @@ class Memory {
         }
         ctx.fillStyle = this.color;
         ctx.fill();
+        ctx.fillStyle = "black";
+        ctx.font = "20px sans-serif";
+        ctx.fillText(this.id, this.inpt.x + this.w, this.inpt.y - dot_gap / 3);
+        ctx.font = "10px sans-serif";
         if (this.sel_flag) {
             drawStar(ctx, this.inpt.x, this.inpt.y - dot_gap / 3);
             drawStar(ctx, this.inpt.x + this.w, this.inpt.y - dot_gap / 3);
             drawStar(ctx, this.inpt.x, this.inpt.y - dot_gap / 3 + this.h);
             drawStar(ctx, this.inpt.x + this.w, this.inpt.y - dot_gap / 3 + this.h);
         }
+
     }
 
+    bit_evaluate() {
+        var flag = false;
+        for (let conn_id of this.association) {
+            var conn = dc.cir_ele_map[conn_id];
+            var prev_val = conn.val;
+            conn.val = this.val;
+            if (prev_val !== conn.val) {
+                flag = true;
+            }
+            for (let conn_assoc_id of conn.association) {
+                var assoc = dc.cir_ele_map[conn_assoc_id];
+                if (assoc.type === 'InPin' || assoc.type === 'memory' || assoc.type === 'outbit') {
+                    assoc.val = conn.val;
+                }
+            }
+        }
+        return flag;
+    }
 }
 
 class Chip extends Element {
@@ -428,6 +490,8 @@ class Chip extends Element {
     dependency = [];
     layer = -1;
     memory = 1;
+    parent_id = -1;
+
     constructor(id, x, y, inputs, outputs, label) {
         super();
         this.id = id;
@@ -510,75 +574,109 @@ class Chip extends Element {
     }
 
     chip_evaluate() {
+        // value 5 means unknown state
         var flag = false;
+        console.log("chip label: " + this.label + " Chip ID: " + this.id);
+        var prev_val = this.out_pins[0].val;
         if (this.label === 'NOT') {
-            if (this.in_pins[0].val === 1) {
-                this.out_pins[0].val = 0;
-                flag = true;
-            } else if (this.in_pins[0].val === 0) {
-                this.out_pins[0].val = 1;
-                flag = true;
+            console.log("this.in_pins[0].val: " + this.in_pins[0].val + " prev_out: " + this.out_pins[0].val);
+            if (this.in_pins[0].val === 1 || this.in_pins[0].val === 0) {
+                this.out_pins[0].val = this.in_pins[0].val === 0 ? 1 : 0;
+            } else {
+                this.out_pins[0].val = -(this.in_pins[0].val);
             }
+            console.log(" curr_out: " + this.out_pins[0].val);
         } else if (this.label === 'AND') {
+            console.log("this.in_pins[0].val: " + this.in_pins[0].val + " this.in_pins[1].val: " + this.in_pins[1].val + " prev out: " + this.out_pins[0].val);
             if (this.in_pins[0].val === 0 || this.in_pins[1].val === 0) {
                 this.out_pins[0].val = 0;
-                flag = true;
-            } else if (this.in_pins[0].val === 1 && this.in_pins[1].val === 1) {
-                this.out_pins[0].val = 1;
-                flag = true;
+            } else if (this.in_pins[0].val === 1) {
+                this.out_pins[0].val = this.in_pins[1].val;
+            } else if (this.in_pins[1].val === 1) {
+                this.out_pins[0].val = this.in_pins[0].val;
+            } else {
+                this.out_pins[0].val = -5;
             }
+            console.log(" curr out: " + this.out_pins[0].val);
         } else if (this.label === 'OR') {
+            console.log("this.in_pins[0].val: " + this.in_pins[0].val + " this.in_pins[1].val: " + this.in_pins[1].val + " prev out: " + this.out_pins[0].val);
             if (this.in_pins[0].val === 1 || this.in_pins[1].val === 1) {
                 this.out_pins[0].val = 1;
-                flag = true;
-            } else if (this.in_pins[0].val === 0 && this.in_pins[1].val === 0) {
-                this.out_pins[0].val = 0;
-                flag = true;
+            } else if (this.in_pins[0].val === 0) {
+                this.out_pins[0].val = this.in_pins[1].val;
+            } else if (this.in_pins[1].val === 0) {
+                this.out_pins[0].val = this.in_pins[0].val;
+            } else {
+                this.out_pins[0].val = -5;
             }
+            console.log(" curr out: " + this.out_pins[0].val);
         } else if (this.label === 'XOR') {
+            console.log("this.in_pins[0].val: " + this.in_pins[0].val + " this.in_pins[1].val: " + this.in_pins[1].val + " prev out: " + this.out_pins[0].val);
             if (this.in_pins[0].val === 1 && this.in_pins[1].val === 0) {
                 this.out_pins[0].val = 1;
-                flag = true;
             } else if (this.in_pins[0].val === 0 && this.in_pins[1].val === 1) {
                 this.out_pins[0].val = 1;
-                flag = true;
-            } else if (this.in_pins[0].val === 1 && this.in_pins[1].val === 1) {
+            } else if (this.in_pins[0].val === this.in_pins[1].val) {
                 this.out_pins[0].val = 0;
-                flag = true;
-            } else if (this.in_pins[0].val === 0 && this.in_pins[1].val === 0) {
-                this.out_pins[0].val = 0;
-                flag = true;
+            } else if (this.in_pins[0].val === -(this.in_pins[1].val)) {
+                this.out_pins[0].val = -5;
+            } else if (this.in_pins[0].val === 1) {
+                this.out_pins[0].val = -(this.in_pins[1].val);
+            } else if (this.in_pins[0].val === 0) {
+                this.out_pins[0].val = this.in_pins[1].val;
+            } else if (this.in_pins[1].val === 1) {
+                this.out_pins[0].val = -(this.in_pins[0].val);
+            } else if (this.in_pins[1].val === 0) {
+                this.out_pins[0].val = this.in_pins[0].val;
             }
+            console.log(" curr out: " + this.out_pins[0].val);
         } else if (this.label === 'NOR') {
-            if (this.in_pins[0].val === 0 && this.in_pins[1].val === 0) {
-                this.out_pins[0].val = 1;
-                flag = true;
-            } else if (this.in_pins[0].val === 1 || this.in_pins[1].val === 1) {
+            console.log("this.in_pins[0].val: " + this.in_pins[0].val + " this.in_pins[1].val: " + this.in_pins[1].val + " prev out: " + this.out_pins[0].val);
+            if (this.in_pins[0].val === 1 || this.in_pins[1].val === 1) {
                 this.out_pins[0].val = 0;
-                flag = true;
-            }
-        } else if (this.label === 'XNOR') {
-            if (this.in_pins[0].val === 1 && this.in_pins[1].val === 1) {
-                this.out_pins[0].val = 1;
-                flag = true;
             } else if (this.in_pins[0].val === 0 && this.in_pins[1].val === 0) {
                 this.out_pins[0].val = 1;
-                flag = true;
-            } else if (this.in_pins[0].val === 1 && this.in_pins[1].val === 0) {
-                this.out_pins[0].val = 0;
-                flag = true;
-            } else if (this.in_pins[0].val === 0 && this.in_pins[1].val === 1) {
-                this.out_pins[0].val = 0;
-                flag = true;
+            } else if (this.in_pins[0].val === -(this.in_pins[1].val)) {
+                this.out_pins[0].val = -5;
+            } else if (this.in_pins[0].val === 0) {
+                this.out_pins[0].val = -(this.in_pins[1].val);
+            } else if (this.in_pins[1].val === 0) {
+                this.out_pins[0].val = -(this.in_pins[0].val);
             }
-        } else if (this.label === 'NAND') {
-            if (this.in_pins[0].val === 0 || this.in_pins[1].val === 0) {
+            console.log(" curr out: " + this.out_pins[0].val);
+        } else if (this.label === 'XNOR') {
+            console.log("this.in_pins[0].val: " + this.in_pins[0].val + " this.in_pins[1].val: " + this.in_pins[1].val + " prev out: " + this.out_pins[0].val);
+            if (this.in_pins[0].val === this.in_pins[1].val) {
                 this.out_pins[0].val = 1;
-                flag = true;
-            } else if (this.in_pins[0].val === 1 && this.in_pins[1].val === 1) {
-                this.out_pins[0].val = 0;
-                flag = true;
+            } else if (this.in_pins[0].val === -(this.in_pins[1].val)) {
+                this.out_pins[0].val = -5;
+            } else if (this.in_pins[0].val === 1) {
+                this.out_pins[0].val = this.in_pins[1].val;
+            } else if (this.in_pins[1].val === 1) {
+                this.out_pins[0].val = this.in_pins[0].val;
+            } else if (this.in_pins[0].val === 0) {
+                this.out_pins[0].val = -(this.in_pins[1].val);
+            } else if (this.in_pins[1].val === 0) {
+                this.out_pins[0].val = -(this.in_pins[0].val);
             }
+            console.log(" curr out: " + this.out_pins[0].val);
+        } else if (this.label === 'NAND') {
+            console.log("this.in_pins[0].val: " + this.in_pins[0].val + " this.in_pins[1].val: " + this.in_pins[1].val + " prev out: " + this.out_pins[0].val);
+            if (this.in_pins[0].val === 1 && this.in_pins[1].val === 1) {
+                this.out_pins[0].val = 0;
+            } else if (this.in_pins[0].val === 0 || this.in_pins[1].val === 0) {
+                this.out_pins[0].val = 1;
+            } else if (this.in_pins[0].val === -(this.in_pins[1].val)) {
+                this.out_pins[0].val = -5;
+            } else if (this.in_pins[0].val === 1) {
+                this.out_pins[0].val = -(this.in_pins[1].val);
+            } else if (this.in_pins[1].val === 1) {
+                this.out_pins[0].val = -(this.in_pins[0].val);
+            }
+            console.log(" curr out: " + this.out_pins[0].val);
+        }
+        if (prev_val !== this.out_pins[0].val || this.out_pins[0].val === -5 || this.out_pins[0].val === 5) {
+            flag = true;
         }
         return flag;
     }
@@ -591,6 +689,8 @@ class LineSegment extends Element {
     id = -1;
     type = 'linesegment';
     con_id = -1;
+    parent_id = -1;
+
     constructor(id, start_pt, end_pt) {
         super();
         this.id = id;
@@ -646,6 +746,8 @@ class Jumper extends Element {
     type = 'jumper';
     sel_flag = false;
     con_id = -1;
+    parent_id = -1;
+
     constructor(id, start_x, start_y, end_x, end_y, direction, orientation) {
         super();
         this.id = id;
@@ -778,9 +880,11 @@ class Connection extends Element {
     id = -1;
     type = 'connection';
     last_flag = false;
+    parent_id = -1;
+
     constructor(line_segments) {
         super();
-        this.val = -1;
+        this.val = -5;
 //        this.start_pt = start_pt;
 //        this.end_pt = end_pt;
         this.line_segments = line_segments;
@@ -825,6 +929,33 @@ class Connection extends Element {
     }
 }
 
+class Queue {
+    constructor() {
+        this.items = {};
+        this.head = 0;
+        this.tail = 0;
+    }
+
+    enqueue(item) {
+        this.items[this.tail] = item;
+        this.tail++;
+    }
+
+    dequeue() {
+        if (this.isEmpty())
+            return undefined;
+        const item = this.items[this.head];
+        delete this.items[this.head];
+        this.head++;
+        return item;
+    }
+
+    isEmpty() {
+        return this.head === this.tail;
+    }
+}
+
+
 class Circuit {
     cir_ele_map = {};
     cir_ele = [];
@@ -842,6 +973,7 @@ class Circuit {
     layer_wise_devices = new Map();
     memory = 0;
     name = 'Circuit'
+    bfs_traversal_order = [];
 
     constructor(ctx) {
         this.ctx = ctx;
@@ -923,7 +1055,7 @@ class Circuit {
     add_memory(bit) {
         var id = bit.id;
         if (this.memory_bits.indexOf(id) === -1) {
-            this.memory_bits.push(id);   
+            this.memory_bits.push(id);
         }
         if (this.cir_ele.indexOf(id) === -1) {
             this.cir_ele.push(id);
@@ -993,7 +1125,7 @@ class Circuit {
             }
         }
 
-        if (!flag) {            
+        if (!flag) {
             for (let bit_id of this.memory_bits) {
                 var bit = this.cir_ele_map[bit_id];
                 if ((x === bit.outpt.x && y === bit.outpt.y) || (x === bit.inpt.x && y === bit.inpt.y)) {
@@ -1006,16 +1138,7 @@ class Circuit {
                     flag = true;
                     break;
                 }
-                
-                
-//                else if (x === bit.inpt.x && y === bit.inpt.y) {
-//                    if (conn.association.indexOf(bit.id) === -1) {
-//                        conn.association.push(bit.id);
-//                    }
-//                    flag = true;
-//                    break;
-//                }
-            }            
+            }
         }
 
         if (!flag) {
@@ -1127,33 +1250,37 @@ class Circuit {
     reset_circuit() {
         for (let conn_id of this.connections) {
             var conn = this.cir_ele_map[conn_id];
-            conn.val = -1;
+            conn.val = -5;
             for (let id of conn.association) {
                 var assoc = this.cir_ele_map[id];
-                if (assoc.type !== 'outbit' && assoc.type !== 'memory') {
-                    assoc.val = conn.val;
-                }
+                //if (assoc.type !== 'outbit' && assoc.type !== 'memory') {
+                assoc.val = conn.val;
+                //}
             }
         }
         for (let chip_id of this.chips) {
             var chip = this.cir_ele_map[chip_id];
             for (let pin of chip.in_pins) {
-                pin.val = -1;
+                pin.val = -5;
             }
             for (let pin of chip.out_pins) {
-                pin.val = -1;
+                pin.val = -5;
             }
         }
         for (let comp_id of this.components) {
             var comp = this.cir_ele_map[comp_id];
             for (let pin of comp.in_pins) {
-                pin.val = -1;
+                pin.val = -5;
             }
             for (let pin of comp.out_pins) {
-                pin.val = -1;
+                pin.val = -5;
             }
             comp.reset_circuit();
         }
+    }
+
+    init_connections() {
+        this.reset_circuit();
     }
 
     updateElementAssociation() {
@@ -1196,6 +1323,7 @@ class Circuit {
         for (let conn_id of this.connections) {
             var conn = this.cir_ele_map[conn_id];
             conn.association = [];
+            console.log("conn id: " + conn_id + " terminal pts: " + conn.terminal_pts);
             for (let pt of conn.terminal_pts) {
                 var x = pt.x;
                 var y = pt.y;
@@ -1204,7 +1332,179 @@ class Circuit {
         }
     }
 
-    updateElementDependency() {
+    printBFSTraversalOrder() {
+        for (let id of this.bfs_traversal_order) {
+            console.log(id + ", ");
+        }
+    }
+
+    printParentChildRelation(ele) {
+        console.log("Parent: " + ele.id + " ParentType: " + ele.type);
+        console.log("Child: ");
+        for (let child_id of ele.child_ids) {
+            console.log(child_id + ",");
+        }
+        for (let child_id of ele.child_ids) {
+            var child = this.cir_ele_map[child_id];
+            this.printParentChildRelation(child);
+        }
+    }
+
+    developBFSTraversalOrder() {
+        var queue = new Queue();
+        var visited = [];
+        for (let key of Object.keys(this.cir_ele_map)) {
+            var ele = this.cir_ele_map[key];
+            if (ele.type === 'inbit' || ele.type === 'memory' || ele.type === 'clock') {
+                queue.enqueue(ele.id);
+                visited.push(ele.id);
+                this.bfs_traversal_order.push(ele.id);
+            }
+        }
+        while (!queue.isEmpty()) {
+            var ele_id = queue.dequeue();
+            var ele = this.cir_ele_map[ele_id];
+            //console.log("Dequeue Ele: " + ele.id + ", " + ele.type);
+            for (let child_id of this.getChildIds(ele)) {
+                //console.log("child: " + child_id);
+                var child = this.cir_ele_map[child_id];
+                if (child !== undefined && child.type !== 'outbit') {
+                    queue.enqueue(child_id);
+                    visited.push(child_id);
+                    this.bfs_traversal_order.push(child_id);
+                }
+            }
+        }
+    }
+
+    getChildIds(ele) {
+        //console.log("Ele Type: " + ele.type + " Ele Id: " + ele.id);
+        if (ele.type === 'chip' || ele.type === 'component') {
+            for (let pin of ele.out_pins) {
+                for (let con_id of pin.association) {
+                    var assoc_connection = this.cir_ele_map[con_id];
+                    for (let assoc_ele_id of assoc_connection.association) {
+                        var assoc_ele = this.cir_ele_map[assoc_ele_id];
+                        if (assoc_ele.type === 'InPin') {
+                            var chip_comp_id = assoc_ele.chip_id;
+                            var chip_comp = this.cir_ele_map[chip_comp_id];
+                            //console.log("child type: " + chip_comp.type + " child id: " + chip_comp_id + " child parent_id: " + chip_comp.parent_id);
+                            if (chip_comp.parent_id === -1 && chip_comp.type !== 'InPin' && chip_comp.type !== 'OutPin') {
+                                chip_comp.parent_id = ele.id;
+                                ele.child_ids.push(chip_comp_id);
+                                //console.log("child type: " + chip_comp.type + " child id: " + chip_comp_id + " child parent_id: " + chip_comp.parent_id);
+                            }
+                        } else if (assoc_ele.type !== 'OutPin' && assoc_ele.type !== 'outbit') {
+                            if (assoc_ele.parent_id === -1) {
+                                assoc_ele.parent_id = ele.id;
+                                ele.child_ids.push(assoc_ele.id);
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (ele.type !== 'InPin' && ele.type !== 'OutPin' && ele.type !== "outbit") {
+            //console.log("Ele Type: " + ele.type + " Ele Id: " + ele.id);
+            for (let con_id of ele.association) {
+                var assoc_connection = this.cir_ele_map[con_id];
+                for (let assoc_ele_id of assoc_connection.association) {
+                    var assoc_ele = this.cir_ele_map[assoc_ele_id];
+                    if (assoc_ele.type === 'InPin') {
+                        var chip_comp_id = assoc_ele.chip_id;
+                        var chip_comp = this.cir_ele_map[chip_comp_id];
+                        //console.log("child id: " + chip_comp_id + " child parent_id: " + chip_comp.parent_id);
+                        if (chip_comp.parent_id === -1) {
+                            chip_comp.parent_id = ele.id;
+                            ele.child_ids.push(chip_comp_id);
+                            //console.log("child id: " + chip_comp_id + " child parent_id: " + chip_comp.parent_id);
+                        }
+                    } else if (assoc_ele.type !== 'outbit') {
+                        if (assoc_ele.parent_id === -1) {
+                            assoc_ele.parent_id = ele.id;
+                            ele.child_ids.push(assoc_ele.id);
+                        }
+                    }
+                }
+            }
+        }
+        return ele.child_ids;
+    }
+
+    updateParentChild() {
+        for (let key of Object.keys(this.cir_ele_map)) {
+            var ele = this.cir_ele_map[key];
+            if (ele.type === 'inbit' || ele.type === 'outbit' || ele.type === 'memory' || ele.type === 'clock') {
+                this.updateParentChildForElement(ele);
+                this.printParentChildRelation(ele);
+            }
+        }
+    }
+
+    updateParentChildForElement(ele) {
+        //console.log("Ele Type: " + ele.type + " Ele Id: " + ele.id);
+        if (ele.type === 'chip' || ele.type === 'component') {
+            for (let pin of ele.out_pins) {
+                for (let con_id of pin.association) {
+                    var assoc_connection = this.cir_ele_map[con_id];
+                    for (let assoc_ele_id of assoc_connection.association) {
+                        var assoc_ele = this.cir_ele_map[assoc_ele_id];
+                        if (assoc_ele.type === 'InPin') {
+                            var chip_comp_id = assoc_ele.chip_id;
+                            var chip_comp = this.cir_ele_map[chip_comp_id];
+                            //console.log("child_comp_type: " + chip_comp.type + " child_comp_id: " + chip_comp_id + " child_comp.parent_id: " + chip_comp.parent_id);
+                            if (chip_comp.parent_id === -1 && chip_comp.type !== 'InPin' && chip_comp.type !== 'OutPin') {
+                                chip_comp.parent_id = ele.id;
+                                ele.child_ids.push(chip_comp_id);
+                                //console.log("child_comp_type: " + chip_comp.type + " child_comp_id: " + chip_comp_id + " child_comp.parent_id: " + chip_comp.parent_id);
+                            }
+                        } else if (assoc_ele.type !== 'OutPin') {
+                            if (assoc_ele.parent_id === -1) {
+                                assoc_ele.parent_id = ele.id;
+                                ele.child_ids.push(assoc_ele.id);
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (ele.type !== 'InPin' && ele.type !== 'OutPin' && ele.type !== "outbit") {
+            //console.log("Ele Type: " + ele.type + " Ele Assoc: " + ele.association.length);
+            for (let con_id of ele.association) {
+                var assoc_connection = this.cir_ele_map[con_id];
+                for (let assoc_ele_id of assoc_connection.association) {
+                    var assoc_ele = this.cir_ele_map[assoc_ele_id];
+                    if (assoc_ele.type === 'InPin') {
+                        var chip_comp_id = assoc_ele.chip_id;
+                        var chip_comp = this.cir_ele_map[chip_comp_id];
+                        //console.log("assoc_ele.chip_id: " + assoc_ele.chip_id + " chip_comp.parent_id: " + chip_comp.parent_id);
+                        if (chip_comp.parent_id === -1) {
+                            chip_comp.parent_id = ele.id;
+                            ele.child_ids.push(chip_comp_id);
+                            //console.log("assoc_ele.chip_id: " + assoc_ele.chip_id + " chip_comp.parent_id: " + chip_comp.parent_id);
+                        }
+                    } else {
+                        if (assoc_ele.parent_id === -1) {
+                            assoc_ele.parent_id = ele.id;
+                            ele.child_ids.push(assoc_ele.id);
+                        }
+                    }
+                }
+            }
+        }
+        if (ele.child_ids.length === 0) {
+            return;
+        } else {
+            for (let child_id of ele.child_ids) {
+                //console.log("Ele: " + ele.id + " ele type: " + ele.type);
+                var child = this.cir_ele_map[child_id];
+                if (child.type !== 'outbit') {
+                    this.updateParentChildForElement(child);
+                }
+            }
+        }
+    }
+
+    updateElementDependency()
+    {
 
         for (let key of Object.keys(this.cir_ele_map)) {
             var ele = this.cir_ele_map[key];
@@ -1946,7 +2246,7 @@ class Circuit {
         return flag;
     }
 
-    simulate() {
+    simulate_old() {
         //console.log("Simulation for - Name: " + this.name + " label: " + this.label + " type: " + this.type);
         var already_evaluated = [];
 
@@ -1969,36 +2269,9 @@ class Circuit {
                     }
                     //console.log("Assoc val: " + assoc.val);
                 }
-                conn.val = -1;
+                //conn.val = -5;
             }
         }
-
-        //console.log("this.label: " + this.label + " Circuit Memory: " + this.memory);
-//        if (this.memory === 1) {
-//            for (let outbit_pt_id of this.outbit_pts) {
-//                var outbit_pt = this.cir_ele_map[outbit_pt_id];
-//                for (let id of outbit_pt.association) {
-//                    var conn = this.cir_ele_map[id];
-//                    conn.val = outbit_pt.val;
-//                    for (let assoc_id of conn.association) {
-//                        var assoc = this.cir_ele_map[assoc_id];
-//                        if (assoc.type === 'outbit') {
-//                            assoc.val = conn.val;
-//                        } else if (assoc.type === 'InPin') {
-//                            var chip_comp_id = assoc.chip_id;
-//                            var chip_comp = this.cir_ele_map[chip_comp_id];
-//                            if (chip_comp.label === 'D-FF') {
-//                                console.log("memory: " + chip_comp.memory + " pin val: " + assoc.val + " conn val: " + conn.val);
-//                            }
-//                            if (chip_comp.memory === 1) {
-//                                assoc.val = conn.val;
-//                            }
-//                        }
-//                    }
-//                    conn.val = -1;
-//                }
-//            }
-//        }
 
         for (let bit_id of this.memory_bits) {
             var bit = this.cir_ele_map[bit_id];
@@ -2011,7 +2284,7 @@ class Circuit {
                         assoc.val = conn.val;
                     }
                 }
-                conn.val = -1;
+                //conn.val = -5;
             }
         }
 
@@ -2026,7 +2299,7 @@ class Circuit {
                         assoc.val = conn.val;
                     }
                 }
-                conn.val = -1;
+                //conn.val = -5;
             }
         }
 
@@ -2050,9 +2323,6 @@ class Circuit {
                 } else {
                     eval_ele = device.comp_evaluate();
                 }
-//                if (device.label === 'D-FF') {
-//                    console.log("Loop: " + loop_cnt + " device id: " + device_id + " eval_ele: " + eval_ele);
-//                }
                 if (eval_ele) {
                     already_evaluated.push(device_id);
                     executed_devices.push(device_id);
@@ -2078,21 +2348,6 @@ class Circuit {
                     }
                 }
             }
-
-            //set outputs from the memory if any
-//            for (let id of this.memory_bits) {
-//                var memory = this.cir_ele_map[id];
-//                for (let conn_id of memory.association) {
-//                    var conn = this.cir_ele_map[conn_id];
-//                    conn.val = memory.val;
-//                    for (let assoc_id of conn.association) {
-//                        var assoc = this.cir_ele_map[assoc_id];
-//                        if (assoc.type === 'InPin' || assoc.type === 'outbit' || assoc.type === 'memory') {
-//                            assoc.val = conn.val;
-//                        }
-//                    }
-//                }
-//            }
         }
 
         if (loop_cnt < max_loop) {
@@ -2102,19 +2357,135 @@ class Circuit {
         return done_flag;
     }
 
-    save_as_component_old(name, pin_desc) {
-//        var remove_ele = [];
-//        for (let key of this.cir_ele_map.keys()) {
-//            var ele = this.cir_ele_map.get(key);
-//            if (ele.type === 'linesegment' || ele.type === 'jumper' || ele.type === 'InPin' || ele.type === 'OutPin') {
-//                remove_ele.push(key);
-//            }
-//        }
-//        for (let key of remove_ele) {
-//            this.cir_ele_map.delete(key);
-//            this.cir_ele.splice(this.cir_ele.indexOf(key), 1);
+    evaluate(ele) {
+        console.log("already_evaluated: " + already_evaluated);
+        console.log("evaluate: " + ele.type + " ID: " + ele.id);
+        console.log("child_ids: " + ele.child_ids.length);
+        if (ele.child_ids.length > 0) {
+            for (let child_id of ele.child_ids) {
+                var child = this.cir_ele_map[child_id];
+                if (already_evaluated.indexOf(child.id) === -1) {
+                    var eval_ele = false;
+                    if (child.type === 'chip') {
+                        eval_ele = child.chip_evaluate();
+                    } else if (child.type === 'component') {
+                        eval_ele = child.comp_evaluate();
+                    }
+                    if (eval_ele) {
+                        for (let pin of child.out_pins) {
+                            for (let id of pin.association) {
+                                var conn = this.cir_ele_map[id];
+                                conn.val = pin.val;
+                                for (let assoc_id of conn.association) {
+                                    var assoc = this.cir_ele_map[assoc_id];
+                                    if (assoc.type === 'InPin' || assoc.type === 'outbit' || assoc.type === 'memory') {
+                                        assoc.val = conn.val;
+                                    }
+                                }
+                            }
+                        }
+                        already_evaluated.push(child_id);
+                    }
+                }
+                this.evaluate(child);
+            }
+        } else {
+            return;
+        }
+    }
+
+    simulate(max_loop) {
+        console.log("Simulate id: " + this.id + " type: " + this.type);
+        var flag = true;
+        var loop_cnt = 0;
+        while (flag && loop_cnt < max_loop) {
+            flag = false;
+            loop_cnt++;
+            console.log("##Loop: " + loop_cnt);
+            for (let id of this.bfs_traversal_order) {
+                var ele = this.cir_ele_map[id];
+                //console.log("Evalue: " + id + " Type: " + ele.type + " Assoc: " + ele.association);
+                var eval_ele = false;
+                //console.log("device id: " + device_id + " type: " + device.type);
+                if (ele.type === 'inbit' || ele.type === 'memory' || ele.type === 'clock') {
+                    eval_ele = ele.bit_evaluate();
+                    //console.log("Bit: " + ele.id + " eval_ele: " + eval_ele);
+                } else if (ele.type === 'chip') {
+                    eval_ele = ele.chip_evaluate();
+                    //console.log("Chip: " + ele.id + " eval_ele: " + eval_ele);
+                } else if (ele.type === 'component') {
+                    eval_ele = ele.comp_evaluate(max_loop);
+                    //console.log("Component: " + ele.id + " eval_ele: " + eval_ele);
+                }
+                //console.log("Eval Flag: " + eval_ele);
+                if (eval_ele && (ele.type === 'chip' || ele.type === 'component')) { // state changed
+                    flag = true;
+                }
+                if (ele.type === 'chip' || ele.type === 'component') {
+                    for (let pin of ele.out_pins) {
+                        for (let id of pin.association) {
+                            var conn = this.cir_ele_map[id];
+                            conn.val = pin.val;
+                            for (let assoc_id of conn.association) {
+                                var assoc = this.cir_ele_map[assoc_id];
+//                                if (ele.id === 1) {
+//                                    console.log("ele id: " + ele.id + " type: " + ele.type + " pin: " + pin.number + "," + pin.id + "," + pin.val + " assoc conn: " + conn.id + "," + conn.val + " conn assoc: " + conn.association + " assoc: " + assoc.id + "," + assoc.type + "," + assoc.val);
+//                                }
+                                if (assoc.type === 'InPin' || assoc.type === 'outbit' || assoc.type === 'memory') {
+                                    assoc.val = conn.val;
+                                    //console.log("Final Type: " + assoc.type + " Final ID: " + assoc.id + " Final Val: " + assoc.val);
+                                }
+                            }
+                        }
+                    }
+                } else if (ele.type === 'inbit') {
+                    //console.log("Ele Id: " + ele.id + " Association: " + ele.association);
+                    for (let conn_id of ele.association) {
+                        //console.log("Assoc Conn: " + conn_id);
+                        var conn = this.cir_ele_map[conn_id];
+                        conn.val = ele.val;
+                        //console.log("conn id: " + conn.id + " conn.val: " + conn.val + " Conn Association: " + conn.association);
+                        for (let conn_assoc_id of conn.association) {
+                            var assoc = this.cir_ele_map[conn_assoc_id];
+                            //console.log("Conn Assoc Id: " + conn_assoc_id + " Conn Assoc Type: " + assoc.type);
+                            if (assoc.type === 'InPin' || assoc.type === 'memory' || assoc.type === 'outbit') {
+                                assoc.val = conn.val;
+                                //console.log("Conn Assoc Val: " + assoc.val);
+                            }
+                        }
+                    }
+                } else if (ele.type === 'clock') {
+                    //console.log("Ele Id: " + ele.id + " Association: " + ele.association);
+                    for (let conn_id of ele.association) {
+                        //console.log("Assoc Conn: " + conn_id);
+                        var conn = this.cir_ele_map[conn_id];
+                        conn.val = ele.val;
+                        //console.log("conn id: " + conn.id + " conn.val: " + conn.val + " Conn Association: " + conn.association);
+                        for (let conn_assoc_id of conn.association) {
+                            var assoc = this.cir_ele_map[conn_assoc_id];
+                            //console.log("Conn Assoc Id: " + conn_assoc_id + " Conn Assoc Type: " + assoc.type);
+                            if (assoc.type === 'InPin' || assoc.type === 'memory' || assoc.type === 'outbit') {
+                                assoc.val = conn.val;
+                                //console.log("Conn Assoc Val: " + assoc.val);
+                            }
+                        }
+                    }
+                    //ele.change_val();
+                }
+            }
+        }
+
+        //console.log("This Type: " + this.type + " this label: " + this.label + " This Id: " + this.id);
+
+//        if (this.type !== undefined) {
+//            console.log(" this.in_pins[0]: " + this.in_pins[0].val + " this.in_pins[1]: " + this.in_pins[1].val);
+//            console.log(" this.out_pins[0]: " + this.out_pins[0].val + " this.out_pins[1]: " + this.out_pins[1].val);
 //        }
 
+        return flag;
+    }
+
+    save_as_component_old(name, pin_desc) {
         var jsonObject = {};
         jsonObject ["type"] = "component";
         jsonObject ["name"] = name;
@@ -2204,13 +2575,15 @@ class Component extends Circuit {
     clock_id = null;
     dependency = [];
     type = 'component';
+    parent_id = -1;
+    child_ids = [];
+    bfs_traversal_order = [];
     constructor(id, ctx, json, x, y) {
         super(ctx);
         this.id = id;
+        this.bfs_traversal_order = json.bfs_traversal_order;
         const conn_map = new Map();
-
         if (json.cir_ele_map !== undefined) {
-            //console.log("creating cir_ele_map");
             for (let key of Object.keys(json.cir_ele_map)) {
                 var ele_data = json.cir_ele_map[key];
                 var id = ele_data.id;
@@ -2223,7 +2596,13 @@ class Component extends Circuit {
                         for (let dep_id of ele_data.dependency) {
                             ele.dependency.push(dep_id);
                         }
-                        //ele.layer = ele_data.layer;
+                        for (let pin of ele.in_pins) {
+                            console.log("Ele: " + ele.id + " pin number: " + pin.number + " pin id: " + pin.id);
+                        }
+                        for (let j = 0; j < ele_data.in_pins.length; j++) {
+                            var json_pin = ele_data.in_pins[j];
+                            console.log("Ele: " + ele.id + " pin number: " + json_pin.number + " pin id: " + json_pin.id);
+                        }
                         for (let pin of ele.in_pins) {
                             for (let j = 0; j < ele_data.in_pins.length; j++) {
                                 var json_pin = ele_data.in_pins[j];
@@ -2241,10 +2620,12 @@ class Component extends Circuit {
                         }
                         for (let pin of ele.out_pins) {
                             for (let json_pin of ele_data.out_pins) {
+                                console.log("json_pin.number: " + json_pin.number + " pin.number: " + pin.number);
                                 if (json_pin.number === pin.number) {
                                     pin.id = json_pin.id;
                                     this.cir_ele_map[pin.id] = pin;
                                     pin.association = json_pin.association;
+                                    console.log("json_pin.number: " + json_pin.number + " pin.number: " + pin.number + " pin: " + JSON.stringify(pin));
                                     break;
                                 }
                             }
@@ -2294,7 +2675,8 @@ class Component extends Circuit {
                         this.bits.push(id);
                     } else if (type === 'inbit') {
                         ele = new In_Bit(id, ele_data.x, ele_data.y);
-                        ele.association = ele_data.association;
+                        ele.association.push(...ele_data.association);
+                        console.log("Bit Id: " + id + " Asscoaition: " + ele.association.length);
                         this.inbit_pts.push(id);
                         this.bits.push(id);
                     } else if (type === 'memory') {
@@ -2303,19 +2685,25 @@ class Component extends Circuit {
                         ele.association = ele_data.association;
                         this.memory_bits.push(id);
                     } else if (type === 'clock') {
-                        ele = new Clock(id, ele_data.x, ele_data.y, ele_data.high, ele_data.low, ele_data.trigger);
+                        ele = new Clock(id, ele_data.x, ele_data.y, ele_data.high, ele_data.low);
                         ele.association = ele_data.association;
                         this.clock_id = id;
                     }
                     if (type !== 'linesegment' && ele !== null) {
                         //console.log("new component ele_id: " + id + " ele: " + ele.type);
-                        if (this.cir_ele.indexOf(id) === -1 && type !== 'connection') {
+                        if (this.cir_ele.indexOf(id) === -1) {
                             this.cir_ele.push(id);
                         }
                         this.cir_ele_map[id] = ele;
                     }
+                    //console.log("ID: " + ele.id + " Type: " + ele.type + " Association: " + ele.association);
                 }
             }
+        }
+
+        for (let key of Object.keys(this.cir_ele_map)) {
+            var ele = this.cir_ele_map[key];
+            console.log("Key: " + key + " Assoc: " + ele.association);
         }
 
         if (json.name !== undefined) {
@@ -2324,39 +2712,6 @@ class Component extends Circuit {
         if (json.pin_desc !== undefined) {
             this.pin_desc = json.pin_desc;
         }
-
-//        if (json.layer_wise_connections !== undefined) {
-//            this.layer_wise_conns = new Map(Object.entries(JSON.parse(json.layer_wise_connections)));
-//        }
-//        //console.log("load this.layer_wise_conns: " + this.layer_wise_conns.size);
-//        for (let key of this.layer_wise_conns.keys()) {
-//            var conn_layer = this.layer_wise_conns.get(key);
-//            //console.log("key: " + key + " conns: " + conn_layer);
-//        }
-//        //console.log(" conns: " + this.layer_wise_conns.get("1"));
-//        if (json.layer_wise_devices !== undefined) {
-//            this.layer_wise_devices = new Map(Object.entries(JSON.parse(json.layer_wise_devices)));
-//        }
-//        //console.log("load this.layer_wise_devices: " + this.layer_wise_devices.size);
-//        for (let key of this.layer_wise_devices.keys()) {
-//            var dev_layer = this.layer_wise_devices.get(key);
-//            //console.log("key: " + key + " conns: " + dev_layer);
-//        }
-
-//        if (json.bits !== undefined) {
-//            for (let i = 0; i < json.in_bits.length; i++) {
-//                let bit_data = json.in_bits[i];
-//                let in_bit = new In_Bit(available_id, bit_data.x, bit_data.y);
-//                available_id = available_id + 1;
-//                in_bit.id = bit_data.id;
-//                for (let j = 0; j < bit_data.association.length; j++) {
-//                    let assoc_ele = bit_data.association[j];
-//                    in_bit.association.push(conn_map.get(assoc_ele.id));
-//                }
-//                this.inbit_pts.push(in_bit);
-//                this.bits.push(in_bit);
-//            }
-//        }
 
         for (let i = 0; i < this.chips.length; i++) {
             let chip_id = this.chips[i];
@@ -2389,10 +2744,6 @@ class Component extends Circuit {
                 }
             }
         }
-
-//        for (let bit of this.bits) {
-//            this.map.set(bit.id, bit);
-//        }
 
         if (json.inpin_map !== undefined) {
             this.inpin_map = JSON.parse(JSON.stringify(json.inpin_map));
@@ -2510,21 +2861,22 @@ class Component extends Circuit {
         }
     }
 
-    comp_evaluate() {
+    comp_evaluate(max_loop) {
         var flag = false;
         for (let in_pin of this.in_pins) {
             let pin_num = in_pin.number;
             let bit_clock_id = this.inpin_map[pin_num];
             this.cir_ele_map[bit_clock_id].val = in_pin.val;
-//            if (this.label === 'D-FF') {
-//                console.log("D-FF id: " +  this.id + " inpin_num: " + pin_num + " inpin_val: " + in_pin.val + " bit val: " + this.cir_ele_map[bit_clock_id].val);
-//            }
+            console.log("pin_num: " + pin_num + " bit_clock_id: " + bit_clock_id + " inpin_val: " + in_pin.val + " bit_clock_id val: " + this.cir_ele_map[bit_clock_id].val);
         }
-        flag = this.simulate();
+        //this.init_connections();
+        flag = this.simulate(max_loop);
+        console.log("Component: " + this.id + " Type: " + this.type + " Eval Flag: " + flag);
         for (let out_pin of this.out_pins) {
             let pin_num = out_pin.number;
             let bit_id = this.outpin_map[pin_num];
             out_pin.val = this.cir_ele_map[bit_id].val;
+            console.log("Out pin_num: " + pin_num + " bit_id: " + bit_id + " out_pin.val: " + out_pin.val);
         }
         return flag;
     }
@@ -2989,7 +3341,7 @@ function load_circuit(json) {
                         }
                     }
                     dc.components.push(id);
-                } else if (type === 'connection') {                    
+                } else if (type === 'connection') {
                     let ls = [];
                     ele = new Connection(ls);
                     ele.id = ele_data.id;
@@ -3031,7 +3383,7 @@ function load_circuit(json) {
                     ele.association = ele_data.association;
                     dc.memory_bits.push(id);
                 } else if (type === 'clock') {
-                    ele = new Clock(id, ele_data.x, ele_data.y, ele_data.high, ele_data.low, ele_data.trigger);
+                    ele = new Clock(id, ele_data.x, ele_data.y, ele_data.high, ele_data.low);
                     dc.clock_id = id;
                 }
 
@@ -3118,12 +3470,10 @@ $(document).ready(function () {
     $("#add_clock").on('click', function () {
         var high = $("#high_period").val();
         var low = $("#low_period").val();
-        var trigger = document.querySelector('input[name="trigger"]:checked').value;
-        //alert("trigger: " + trigger);
-        if (high === '' || low === '' || trigger === '') {
-            alert("Please enter high and low period and trigger type for clock");
+        if (high === '' || low === '') {
+            alert("Please enter high and low period");
         } else {
-            var clock = new Clock(available_id, init_x, init_y, high, low, trigger);
+            var clock = new Clock(available_id, init_x, init_y, high, low);
             available_id = available_id + 1;
             dc.add_clock(clock);
             dc.redraw();
@@ -3161,82 +3511,103 @@ $(document).ready(function () {
                 for (let id of conn.association) {
                     var assoc = dc.cir_ele_map[id];
                     if (assoc.type === 'InPin' || assoc.type === 'outbit' || assoc.type === 'memory') {
-                        assoc.val = conn.val;                        
+                        assoc.val = conn.val;
                     }
                 }
             }
         }
         dc.redraw();
     });
-    
+
     $("#reset_val_btn").on('click', function () {
         dc.reset_circuit();
         dc.redraw();
     });
+
     function loop_clock(clock, count, i, val) {
         setTimeout(function () {
             if (i <= count * 2) {
                 //console.log('cycle: ' + i);
                 clock.val = val;
                 dc.redraw();
-                if (((clock.trigger === '1' || clock.trigger === '3') && val === '1') || ((clock.trigger === '2' || clock.trigger === '4') && val === 0)) {
-                    dc.simulate();
-                    dc.redraw();
-                    dc.reset_circuit();
-                }
+//                if (val === '1' || val === 0) {
+//                    dc.simulate();
+//                    dc.redraw();
+//                }
                 i++;
                 val = val === 0 ? 1 : 0;
                 loop_clock(clock, count, i, val);
             } else {
-                clock.val = -1;
+                clock.val = -5;
                 dc.redraw();
             }
         }, 1000);
     }
 
-
     $("#start_clock").on('click', function () {
-//var cycles = $("#no_of_cycles").val();
-        var cycles = 1;
-        dc.updateElementAssociation();
-        //dc.updateElementDependency();
-        //dc.updateCircuitLayerInfo();
-
-        var clock = dc.cir_ele_map[dc.clock_id];
-        clock.val = 1;
-        dc.redraw();
-        if (clock.trigger === '1' || clock.trigger === '3') {
-            dc.simulate();
-            dc.redraw();
-            dc.reset_circuit();
+        const selectedRadio = document.querySelector('input[name="clock"]:checked');
+        //alert("selectedRadio: " + selectedRadio.value);
+        if (selectedRadio.value === '1') {
+            trigger_clock('level', 1);
+        } else if (selectedRadio.value === '2') {
+            trigger_clock('level', 0);
+        } else if (selectedRadio.value === '3') {
+            trigger_clock('edge', 1);
+        } else if (selectedRadio.value === '4') {
+            trigger_clock('edge', 0);
         }
-        setTimeout(function () {
-            clock.val = 0;
-            dc.redraw();
-            if (clock.trigger === '2' || clock.trigger === '4') {
-                dc.simulate();
-                dc.redraw();
-                dc.reset_circuit();
-            }
-            var next_cycle = 3;
-            var next_val = 1;
-            loop_clock(clock, cycles, next_cycle, next_val);
-        }, 1000);
     });
+
+    function trigger_clock(trigger_type, val) {
+        var max_try = $('#max_try').val();
+        if (max_try < 10) {
+            max_try = 10;
+        }
+        var cycles = 1;
+        stop_simulation_flag = false;
+        dc.bfs_traversal_order = [];
+        dc.updateElementAssociation();
+        dc.developBFSTraversalOrder();
+        dc.printBFSTraversalOrder();
+        var clock = dc.cir_ele_map[dc.clock_id];
+        clock.val = val;
+        if (trigger_type === 'edge') {
+            clock.edge_flag = 1;
+            clock.already_triggered = 0;
+        } else {
+            clock.edge_flag = 0;
+        }
+        dc.redraw();
+        dc.simulate(max_try);
+        //dc.redraw();
+        setTimeout(function () {
+            clock.val = -5;
+            dc.redraw();
+        }, 200);
+//        setTimeout(function () {
+//            clock.val = val === 0 ? 1 : 0;
+//            dc.redraw();
+//            //dc.simulate(max_try);
+//            //dc.redraw();
+//            var next_cycle = 3;
+//            var next_val = clock.val === 0 ? 1 : 0;
+//            loop_clock(clock, cycles, next_cycle, next_val);
+//        }, 1000);
+    }
+
     $("#sim_btn").on('click', function () {
         stop_simulation_flag = false;
+        var max_try = $('#max_try').val();
+        if (max_try < 10) {
+            max_try = 10;
+        }
+        dc.bfs_traversal_order = [];
+        dc.init_connections();
         dc.updateElementAssociation();
-//        for (let id of dc.connections) {
-//            var conn = dc.cir_ele_map[id];
-//            for (let assoc_id of conn.association) {
-//                var assoc = dc.cir_ele_map[assoc_id];
-//                console.log(" conn_id: " + id + " assoc id: " + assoc_id + " type: " + assoc.type);
-//            }
-//        }
-        //return 0;
-        //dc.updateElementDependency();
-        //dc.updateCircuitLayerInfo();
-        dc.simulate();
+        //dc.updateParentChild();
+        dc.developBFSTraversalOrder();
+        dc.printBFSTraversalOrder();
+        dc.simulate(max_try);
         dc.redraw();
         dc.reset_circuit();
     });
